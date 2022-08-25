@@ -1,0 +1,31 @@
+dataset:
+  type: train
+  data_root_path: ../rsna-2022-cervical-spine-fracture-detection
+  target_columns: [C1, C2, C3, C4, C5, C6, C7]
+  cv:
+    type: KFold
+    seed: 42
+    n_folds: 5
+    fold: 0  # null -> run all folds for monai/run.py
+
+  num_workers: null  # null -> os.cpu_count()
+  train_batch_size: 4
+  valid_batch_size: 4
+  test_batch_size: 4
+
+model:
+  seed: 42
+  name: resnet10
+  num_labels: 7
+  pretrained: false
+
+  optimizer:
+    name: AdamW
+    scheduler:
+      name: cosine
+      num_warmup_steps: 0
+      num_training_steps: 10
+
+
+train:
+  learning_rate: 1e-3
