@@ -1,85 +1,83 @@
 import logging
 from pytorch_lightning import LightningDataModule
 import os
-from typing import Union, Optional, Tuple
+from typing import Optional
 from torch.utils.data import Dataset, DataLoader
-import torch
+import numpy as np
 import pandas as pd
-from .. import data as _data_module
+import torch
+import CSFD.data
+import CSFD.data.three_dimensions
 
 
 __all__ = [
-    "SpineScansDataset", "SpineScansDataModule"
+    "CSFDDataModule"
 ]
 
-class SpineScansDataset(Dataset):
+
+class CSFDDataset(Dataset):
     def __init__(
         self,
-        volume_dir: str,
         df: pd.DataFrame,
-        mode: str,
-        # split: float,
-        in_memory: bool = False,
-        # random_state=42,
+        target_columns=None,
+        depth=None,
+        datatype_to_load="npz"
     ):
-        self.volume_dir = volume_dir
-        self.mode = mode
-        self.in_memory = in_memory
-
-        self.table = df
-
-        # # shuffle data
-        # self.table = self.table.sample(frac=1, random_state=random_state).reset_index(drop=True)
-
-        # # split dataset
-        # assert 0.0 <= split <= 1.0
-        # frac = int(split * len(self.table))
-        # self.table = self.table[:frac] if mode == 'train' else self.table[frac:]
-
-        # populate images/labels
-        self.label_names = sorted([c for c in self.table.columns if c.startswith("C")])
-        self.labels = self.table[self.label_names].values if self.label_names else [None] * len(self.table)
-        self.volumes = [os.path.join(volume_dir, f"{row['StudyInstanceUID']}.pt") for _, row in self.table.iterrows()]
-        assert len(self.volumes) == len(self.labels)
+        assert target_columns is None or np.all(np.isin(target_columns, df.columns))
+        if datatype_to_load == "npz":
+            self.images_paths = df["np_images_path"].to_list()
+        elif datatype_to_load == "dcm":
+            self.images_paths = df["dcm_images_path"].to_list()
+        else:
+            raise ValueError(datatype_to_load)
+        self.study_uid_list = df["StudyInstanceUID"].to_list()
+        self.datatype_to_load = datatype_to_load
+        self.target_columns = [None] * len(df) if target_columns is None else df.loc[:, target_columns].to_numpy(int)
+        self.depth = depth
 
     def __getitem__(self, idx: int) -> dict:
-        label = self.labels[idx]
-        vol_ = self.volumes[idx]
-        if isinstance(vol_, str):
-            # try:
-            vol = torch.load(vol_).to(torch.float32)
-            # except (EOFError, RuntimeError):
-            #     print(f"failed loading: {vol_}")
+        uid = self.study_uid_list[idx]
+
+        if self.datatype_to_load == "npz":
+            vol = np.load(self.images_paths[idx])["arr_0"]
+            if self.depth is not None:
+                idx2 = np.quantile(np.arange(len(vol)), np.linspace(0.1, 0.9, self.depth)).astype(int)
+                vol = vol[idx2]
+        elif self.datatype_to_load == "dcm":
+            vol = CSFD.data.three_dimensions.load_3d_images(self.images_paths[idx], depth=self.depth, n_jobs=1)
         else:
-            vol = vol_
-        if self.in_memory:
-            self.volumes[idx] = vol
-        # in case of predictions, return image name as label
-        label = label if label is not None else vol_
-        return {"data": vol.unsqueeze(0), "label": label}
+            raise RuntimeError
+
+        vol = vol[np.newaxis, ...]
+        vol = torch.Tensor(vol).half()
+
+        if self.target_columns[idx] is None:
+            return {
+                "uid": uid,
+                "data": vol
+            }
+        else:
+            label = torch.Tensor(self.target_columns[idx])
+            return {
+                "uid": uid,
+                "data": vol,
+                "label": label
+            }
 
     def __len__(self) -> int:
-        return len(self.volumes)
+        return len(self.images_paths)
 
 
-class SpineScansDataModule(LightningDataModule):
-    def __init__(
-        self,
-        cfg,
-        in_memory: bool = False,
-        train_transforms=None,
-        valid_transforms=None
-    ):
+class CSFDDataModule(LightningDataModule):
+    def __init__(self, cfg, df):
         super().__init__()
 
         self.cfg = cfg
+        self.df = df
 
-        self.train_dir = self.cfg.dataset.data_root_path / 'train_volumes'
-        self.test_dir = self.cfg.dataset.data_root_path / 'test_volumes'
-        self.df = _data_module.get_df(self.cfg)
+        # self.df = _data_module.get_df(self.cfg.dataset)
 
         # other configs
-        self.in_memory = in_memory
         self.num_workers = (
             self.cfg.dataset.num_workers
             if self.cfg.dataset.num_workers is not None
@@ -92,72 +90,64 @@ class SpineScansDataModule(LightningDataModule):
         self.valid_dataset = None
         self.test_dataset = None
         self.label_names = {}
-        self.train_transforms = train_transforms
-        self.valid_transforms = valid_transforms
+        # self.train_transforms = train_transforms
+        # self.valid_transforms = valid_transforms
 
     @property
     def num_labels(self) -> int:
         return len(self.label_names)
 
     def setup(self, stage=None):
-        """Prepare datasets"""
-
         if stage == "fit":
-            self.train_dataset = SpineScansDataset(
-                volume_dir=self.train_dir,
-                df=self.df,
-                in_memory=self.in_memory,
-                mode='train'
+            self.train_dataset = CSFDDataset(
+                self.df[self.df["fold"] != self.cfg.dataset.cv.fold],
+                self.cfg.dataset.target_columns,
+                self.cfg.dataset.depth,
+                self.cfg.dataset.type_to_load
             )
             logging.info(f"training dataset: {len(self.train_dataset)}")
-        elif stage == "validate":
-            self.valid_dataset = SpineScansDataset(
-                volume_dir=self.train_dir,
-                df=self.df,
-                in_memory=self.in_memory,
-                mode='valid'
+        if stage in ("fit", "validate"):
+            self.valid_dataset = CSFDDataset(
+                self.df[self.df["fold"] == self.cfg.dataset.cv.fold],
+                self.cfg.dataset.target_columns,
+                self.cfg.dataset.depth,
+                self.cfg.dataset.type_to_load
             )
             logging.info(f"validation dataset: {len(self.valid_dataset)}")
-            self.label_names = sorted(set(self.train_dataset.label_names + self.valid_dataset.label_names))
-
-        if not os.path.isdir(self.test_dir):
-            logging.warning(f"Missing test folder: {self.test_dir}")
-            return
-        ls_cases = [os.path.basename(p) for p in self.test_dir.glob('*')]
-        self.test_table = [dict(StudyInstanceUID=os.path.splitext(n)[0]) for n in ls_cases]
-        self.test_dataset = SpineScansDataset(
-            self.test_dir,
-            df=pd.DataFrame(self.test_table),
-            mode='test',
-        )
-        logging.info(f"test dataset: {len(self.test_dataset)}")
+            self.label_names = self.cfg.dataset.target_columns
+        if stage == "predict":
+            self.test_dataset = CSFDDataset(
+                self.df,
+                depth=self.cfg.dataset.depth,
+                datatype_to_load=self.cfg.dataset.type_to_load
+            )
+            logging.info(f"test dataset: {len(self.test_dataset)}")
 
     def train_dataloader(self) -> DataLoader:
         return DataLoader(
             self.train_dataset,
             shuffle=True,
-            # batch_transforms=self.train_transforms,
             batch_size=self.cfg.dataset.train_batch_size,
-            num_workers=self.num_workers
+            num_workers=self.num_workers,
+            drop_last=True
         )
 
     def val_dataloader(self) -> DataLoader:
         return DataLoader(
             self.valid_dataset,
             shuffle=False,
-            # batch_transforms=self.valid_transforms,
             batch_size=self.cfg.dataset.valid_batch_size,
-            num_workers=self.num_workers
+            num_workers=self.num_workers,
+            drop_last=True
         )
 
-    def test_dataloader(self) -> Optional[DataLoader]:
+    def predict_dataloader(self) -> Optional[DataLoader]:
         if not self.test_dataset:
             logging.warning('no testing data found')
             return
         return DataLoader(
             self.test_dataset,
             shuffle=False,
-            # batch_transforms=self.valid_transforms,
             batch_size=self.cfg.dataset.test_batch_size,
             num_workers=self.num_workers
         )

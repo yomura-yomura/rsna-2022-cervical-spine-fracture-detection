@@ -8,28 +8,32 @@ dataset:
     type: KFold
     seed: 42
     n_folds: 2
-    fold: 0  # null -> run all folds for monai/run.py
+    fold: null  # null -> run all folds for monai/run.py
 
   num_workers: null  # null -> os.cpu_count()
-  train_batch_size: 2
-  valid_batch_size: 2
+  train_batch_size: 4
+  valid_batch_size: 4
   test_batch_size: 2
 
   depth: 128
 
 model:
   seed: 42
-  name: resnet10
+  name: EfficientNetBN
   kwargs:
-     n_input_channels: 1
+    model_name: efficientnet-b3
+    in_channels: 1
+    pretrained: true
+
+  use_multi_sample_dropout: true
 
   optimizer:
     name: AdamW
     scheduler:
-#      name: null
-      name: cosine
-      num_warmup_steps: 50
-      num_training_steps: 10000
+      name: null
+#      name: linear
+#      num_warmup_steps: 500
+#      num_training_steps: 2100
 
 
 train:
@@ -40,12 +44,15 @@ train:
 
   seed: 42
 
-  max_epochs: 5
+  max_epochs: 4
 
   learning_rate: 1e-4
   weight_decay: 0
-  name_suffix: test
+  name_prefix: ""
+  name_suffix: test-v13
   model_path: models
+
+  early_stopping: true
 
   validation_interval: 0.2
   evaluate_after_steps: 0

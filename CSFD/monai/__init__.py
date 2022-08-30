@@ -1,8 +1,8 @@
-from .module import Module
-from .datamodule import SpineScansDataModule
+from .module import CSFDModule
+from .datamodule import CSFDDataModule
 
 
-__all__ = ["Module", "SpineScansDataModule"]
+__all__ = ["CSFDModule", "CSFDDataModule"]
 
 
 

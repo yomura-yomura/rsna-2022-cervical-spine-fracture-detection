@@ -1,34 +1,79 @@
-import cv2
-import pydicom
-from PIL import Image
-from dipy.denoise.nlmeans import nlmeans
-from dipy.denoise.noise_estimate import estimate_sigma
-from pydicom.pixel_data_handlers import apply_voi_lut
-from kaggle_volclassif.utils import interpolate_volume
-from skimage import exposure
+import gc
+import sys
+import warnings
+
+import tqdm
+import numpy as np
 import pathlib
-import torch
+import joblib
+from . import io as _io_module
 
 
-def convert_volume(dir_path, out_dir: str = "test_volumes", size = (224, 224, 224)):
-    dir_path = pathlib.Path(dir_path)
-    image_paths = sorted(dir_path.glob("*.dcm"))
+def save_all_3d_images(images_dir_path, output_dir_path, uid_list=None, n_jobs=-1, depth=None):
+    images_dir_path = pathlib.Path(images_dir_path)
+    output_dir_path = pathlib.Path(output_dir_path)
+    output_dir_path.mkdir(parents=True, exist_ok=True)
 
-    imgs = []
-    for img_p in image_paths:
-        dicom = pydicom.dcmread(img_p)
-        img = apply_voi_lut(dicom.pixel_array, dicom)
-        img = cv2.resize(img, size[:2], interpolation=cv2.INTER_LINEAR)
-        imgs.append(img.tolist())
-    vol = torch.tensor(imgs, dtype=torch.float32)
+    if uid_list is None:
+        dicom_paths = list(images_dir_path.glob("*"))
+    else:
+        dicom_paths = []
+        for uid in uid_list:
+            dicom_path = images_dir_path / uid
+            if not dicom_path.exists():
+                warnings.warn(f"{dicom_path} not found in {images_dir_path}", UserWarning)
+                continue
+            dicom_paths.append(dicom_path)
 
-    vol = (vol - vol.min()) / float(vol.max() - vol.min())
-    vol = interpolate_volume(vol, size).numpy()
+    for dicom_path in tqdm.tqdm(dicom_paths, file=sys.stdout, desc="creating 3d images"):
+        output_path = output_dir_path / f"{dicom_path.name}.npz"
+        if output_path.exists():
+            continue
 
-    # https://scikit-image.org/docs/stable/auto_examples/color_exposure/plot_adapt_hist_eq_3d.html
-    vol = exposure.equalize_adapthist(vol, kernel_size=np.array([64, 64, 64]), clip_limit=0.01)
-    # vol = exposure.equalize_hist(vol)
-    vol = np.clip(vol * 255, 0, 255).astype(np.uint8)
+        images = load_3d_images(dicom_path, n_jobs=n_jobs, depth=depth)
+        # np.savez_compressed(output_path, images)
+        np.savez(output_path, images)
 
-    path_pt = os.path.join(out_dir, f"{os.path.basename(dir_path)}.pt")
-    torch.save(torch.tensor(vol), path_pt)
+        # might be needed for kaggle notebook
+        del images
+        gc.collect()
+
+
+def load_3d_images(dicom_dir_path, n_jobs=-1, image_2d_shape=(256, 256), depth=None):
+    dicom_paths = sorted(pathlib.Path(dicom_dir_path).glob("*"), key=lambda p: int(p.name.split(".")[0]))
+    # print(len(dicom_paths), dicom_dir_path)
+    if depth is not None:
+        # instead of zooming whole dicom series, load only part of the images
+        indices = np.quantile(np.arange(len(dicom_paths)), np.linspace(0.1, 0.9, depth)).astype(int)
+        dicom_paths = [dicom_paths[i] for i in indices]
+
+    if n_jobs == 1:
+        images = [_io_module.load_image(dicom_path, image_2d_shape) for dicom_path in dicom_paths]
+    else:
+        images = joblib.Parallel(n_jobs=n_jobs)(
+            joblib.delayed(_io_module.load_image)(dicom_path, image_2d_shape)
+            for dicom_path in dicom_paths
+        )
+    return np.stack(images, axis=0)
+
+
+def get_df(dataset_cfg):
+    df = _io_module.get_df(dataset_cfg)
+    if dataset_cfg.type_to_load == "npz":
+        save_all_3d_images(
+            images_dir_path=pathlib.Path(dataset_cfg.data_root_path) / f"{dataset_cfg.type}_images",
+            output_dir_path=dataset_cfg.train_3d_images,
+            uid_list=df["StudyInstanceUID"]
+        )
+        df["np_images_path"] = df["StudyInstanceUID"].map(
+            lambda uid: pathlib.Path(dataset_cfg.train_3d_images) / f"{uid}.npz"
+        )
+        if np.all(df["np_images_path"].map(lambda p: p.exists())) == np.False_:
+            raise FileNotFoundError
+    elif dataset_cfg.type_to_load == "dcm":
+        df["dcm_images_path"] = df["StudyInstanceUID"].map(
+            lambda uid: pathlib.Path(dataset_cfg.data_root_path) / f"{dataset_cfg.type}_images" / uid
+        )
+    else:
+        raise ValueError(dataset_cfg.type_to_load)
+    return df

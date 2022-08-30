@@ -19,9 +19,9 @@ dataset:
 
 model:
   seed: 42
-  name: resnet10
+  name: resnet50
   kwargs:
-     n_input_channels: 1
+    n_input_channels: 1
 
   optimizer:
     name: AdamW
@@ -29,7 +29,7 @@ model:
 #      name: null
       name: cosine
       num_warmup_steps: 50
-      num_training_steps: 10000
+      num_training_steps: 3000
 
 
 train:
@@ -43,7 +43,7 @@ train:
   max_epochs: 5
 
   learning_rate: 1e-4
-  weight_decay: 0
+  weight_decay: 1e-5
   name_suffix: test
   model_path: models
 

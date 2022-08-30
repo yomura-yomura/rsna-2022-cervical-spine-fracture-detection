@@ -7,3 +7,13 @@ pandas
 omegaconf
 scikit-learn
 torch
+pytorch_lightning
+numpy
+
+scikit-image
+opencv-python
+gdcm
+pylibjpeg
+pylibjpeg-libjpeg
+
+wandb
