@@ -2,20 +2,30 @@ dataset:
   type: train
   data_root_path: ../data/rsna-2022-cervical-spine-fracture-detection
   train_3d_images: ../data/3d_train_images
+  image_2d_shape: [256, 256]
+#  image_2d_shape: [300, 300]
+  depth: 128
+#  depth: 200
+  enable_depth_resized_with_cv2: true
+  depth_range: [0.1, 0.9]
+#  data_type: u1
+  data_type: f4
+
+  type_to_load: npz
+#  type_to_load: dcm
 
   target_columns: [patient_overall, C1, C2, C3, C4, C5, C6, C7]
   cv:
     type: KFold
     seed: 42
-    n_folds: 2
+    n_folds: 4
     fold: null  # null -> run all folds for monai/run.py
 
   num_workers: null  # null -> os.cpu_count()
-  train_batch_size: 4
-  valid_batch_size: 4
+  train_batch_size: 2
+  valid_batch_size: 2
   test_batch_size: 2
 
-  depth: 128
 
 model:
   seed: 42
@@ -31,9 +41,9 @@ model:
     name: AdamW
     scheduler:
       name: null
-#      name: linear
-#      num_warmup_steps: 500
-#      num_training_steps: 2100
+#      name: cosine
+#      num_warmup_steps: 50
+#      num_training_steps: 10000
 
 
 train:
@@ -44,17 +54,17 @@ train:
 
   seed: 42
 
-  max_epochs: 4
+  max_epochs: 5
 
   learning_rate: 1e-4
   weight_decay: 0
   name_prefix: ""
-  name_suffix: test-v13
+  name_suffix: test-v1.0
   model_path: models
 
-  early_stopping: true
+  early_stopping: false
 
   validation_interval: 0.2
   evaluate_after_steps: 0
 
-  logging_interval: 1
+  logging_interval: 10

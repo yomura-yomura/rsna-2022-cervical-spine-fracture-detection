@@ -14,6 +14,7 @@ def train(cfg):
             print(f"* fold {fold}")
             cfg.dataset.cv.fold = fold
             train(cfg)
+        return
 
     df = CSFD.data.three_dimensions.get_df(cfg.dataset)
     seed_everything(cfg.train.seed)

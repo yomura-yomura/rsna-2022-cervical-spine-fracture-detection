@@ -19,34 +19,58 @@ class CSFDDataset(Dataset):
     def __init__(
         self,
         df: pd.DataFrame,
-        target_columns=None,
-        depth=None,
-        datatype_to_load="npz"
+        cfg_dataset,
     ):
-        assert target_columns is None or np.all(np.isin(target_columns, df.columns))
-        if datatype_to_load == "npz":
+        # assert (
+        #     cfg_dataset.target_columns is None
+        #     or
+        #     np.all(np.isin(cfg_dataset.target_columns, df.columns))
+        # )
+
+        self.cfg_dataset = cfg_dataset
+
+        if self.cfg_dataset.type_to_load == "npz":
             self.images_paths = df["np_images_path"].to_list()
-        elif datatype_to_load == "dcm":
+        elif self.cfg_dataset.type_to_load == "dcm":
             self.images_paths = df["dcm_images_path"].to_list()
         else:
-            raise ValueError(datatype_to_load)
+            raise ValueError(cfg_dataset.datatype_to_load)
+
         self.study_uid_list = df["StudyInstanceUID"].to_list()
-        self.datatype_to_load = datatype_to_load
-        self.target_columns = [None] * len(df) if target_columns is None else df.loc[:, target_columns].to_numpy(int)
-        self.depth = depth
+        self.target_columns = (
+            [None] * len(df)
+            if (
+                self.cfg_dataset.target_columns is None
+                or
+                np.any(np.isin(self.cfg_dataset.target_columns, df.columns)) == np.False_
+            ) else
+            df[list(self.cfg_dataset.target_columns)].to_numpy(int)
+        )
 
     def __getitem__(self, idx: int) -> dict:
         uid = self.study_uid_list[idx]
 
-        if self.datatype_to_load == "npz":
+        if self.cfg_dataset.type_to_load == "npz":
             vol = np.load(self.images_paths[idx])["arr_0"]
-            if self.depth is not None:
-                idx2 = np.quantile(np.arange(len(vol)), np.linspace(0.1, 0.9, self.depth)).astype(int)
-                vol = vol[idx2]
-        elif self.datatype_to_load == "dcm":
-            vol = CSFD.data.three_dimensions.load_3d_images(self.images_paths[idx], depth=self.depth, n_jobs=1)
+            if len(vol) != self.cfg_dataset.depth:
+                vol = CSFD.data.three_dimensions.resize_depth(
+                    vol,
+                    self.cfg_dataset.depth, self.cfg_dataset.depth_range,
+                    self.cfg_dataset.enable_depth_resized_with_cv2
+                )
+        elif self.cfg_dataset.type_to_load == "dcm":
+            vol = CSFD.data.three_dimensions.load_3d_images(
+                self.images_paths[idx],
+                self.cfg_dataset.image_2d_shape,
+                self.cfg_dataset.enable_depth_resized_with_cv2,
+                self.cfg_dataset.data_type,
+                depth=self.cfg_dataset.depth, depth_range=self.cfg_dataset.depth_range,
+                n_jobs=1
+            )
         else:
             raise RuntimeError
+
+        assert vol.dtype == np.dtype(self.cfg_dataset.data_type)
 
         vol = vol[np.newaxis, ...]
         vol = torch.Tensor(vol).half()
@@ -101,25 +125,20 @@ class CSFDDataModule(LightningDataModule):
         if stage == "fit":
             self.train_dataset = CSFDDataset(
                 self.df[self.df["fold"] != self.cfg.dataset.cv.fold],
-                self.cfg.dataset.target_columns,
-                self.cfg.dataset.depth,
-                self.cfg.dataset.type_to_load
+                self.cfg.dataset
             )
             logging.info(f"training dataset: {len(self.train_dataset)}")
         if stage in ("fit", "validate"):
             self.valid_dataset = CSFDDataset(
                 self.df[self.df["fold"] == self.cfg.dataset.cv.fold],
-                self.cfg.dataset.target_columns,
-                self.cfg.dataset.depth,
-                self.cfg.dataset.type_to_load
+                self.cfg.dataset
             )
             logging.info(f"validation dataset: {len(self.valid_dataset)}")
             self.label_names = self.cfg.dataset.target_columns
         if stage == "predict":
             self.test_dataset = CSFDDataset(
                 self.df,
-                depth=self.cfg.dataset.depth,
-                datatype_to_load=self.cfg.dataset.type_to_load
+                self.cfg.dataset
             )
             logging.info(f"test dataset: {len(self.test_dataset)}")
 

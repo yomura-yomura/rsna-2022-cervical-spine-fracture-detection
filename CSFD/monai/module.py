@@ -34,8 +34,6 @@ class CSFDModule(pl.LightningModule):
         super().__init__()
 
         self.cfg = cfg
-        if not hasattr(cfg.model, "use_multi_sample_dropout"):
-            cfg.model.use_multi_sample_dropout = False
 
         if hasattr(monai.networks.nets, self.cfg.model.name):
             model = getattr(monai.networks.nets, self.cfg.model.name)
@@ -48,7 +46,7 @@ Available net_name: {available_model_names}
         self.num_classes = len(self.cfg.dataset.target_columns)
 
         if self.cfg.model.use_multi_sample_dropout:
-            n_model_outputs = 1000
+            n_model_outputs = 100
             self.dropouts = [nn.Dropout(p) for p in np.linspace(0.1, 0.5, 5)]
             self.Linear = nn.Linear(n_model_outputs, self.num_classes)
         else:

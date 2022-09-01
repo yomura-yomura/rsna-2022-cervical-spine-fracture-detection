@@ -4,6 +4,7 @@ import numpy as np
 import CSFD.data
 import attrdict
 
+
 dataset_cfg = attrdict.AttrDict(
     type="train",
     data_root_path="../rsna-2022-cervical-spine-fracture-detection",

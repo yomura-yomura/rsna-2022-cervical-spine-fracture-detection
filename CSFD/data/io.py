@@ -4,7 +4,6 @@ import omegaconf
 import pathlib
 import numpy as np
 import pydicom
-import joblib
 import cv2
 
 
@@ -21,7 +20,38 @@ invalid_study_uid_list = [
 
 def load_yaml_config(path):
     cfg = omegaconf.OmegaConf.load(path)
+    omegaconf.OmegaConf.set_struct(cfg, True)
+
+    with omegaconf.open_dict(cfg):
+        if not hasattr(cfg.dataset, "type_to_load"):
+            cfg.dataset.type_to_load = "npz"
+        if not hasattr(cfg.dataset, "image_2d_shape"):
+            cfg.dataset.image_2d_shape = [256, 256]
+        if not hasattr(cfg.train, "early_stopping"):
+            cfg.train.early_stopping = False
+        if not hasattr(cfg.dataset, "enable_depth_resized_with_cv2"):
+            cfg.dataset.enable_depth_resized_with_cv2 = False
+        if not hasattr(cfg.dataset, "data_type"):
+            cfg.dataset.data_type = "u1"
+        if not hasattr(cfg.dataset, "depth_range"):
+            cfg.dataset.depth_range = [0.1, 0.9]
+        if not hasattr(cfg.dataset, "height_range"):
+            cfg.dataset.height_range = None
+        if not hasattr(cfg.dataset, "width_range"):
+            cfg.dataset.width_range = None
+        if not hasattr(cfg.dataset, "save_images_with_specific_depth"):
+            cfg.dataset.save_images_with_specific_depth = False
+
     return cfg
+
+
+def drop_invalids(*dfs):
+    df = dfs[0]
+    ret = [df_[~df["StudyInstanceUID"].isin(invalid_study_uid_list)] for df_ in dfs]
+    if len(ret) == 1:
+        return ret[0]
+    else:
+        return ret
 
 
 def get_df(dataset_cfg, ignore_invalid=True):
@@ -63,7 +93,7 @@ def get_df(dataset_cfg, ignore_invalid=True):
                 print(f"[Info] {_folds_csv_root_path} has been created.")
 
         if ignore_invalid:
-            df = df[~df["StudyInstanceUID"].isin(invalid_study_uid_list)]
+            df = drop_invalids(df)
     elif dataset_cfg.type == "test":
         if len(get_submission_df(dataset_cfg)) == 3:
             df = pd.DataFrame({
@@ -82,15 +112,21 @@ def get_df(dataset_cfg, ignore_invalid=True):
     return df
 
 
-def load_image(dicom_path, image_shape=(256, 256)):
+def load_image(dicom_path, image_shape=(256, 256), data_type="u1",
+               height_range=None, width_range=None):
     dicom = pydicom.read_file(dicom_path)
     data = dicom.pixel_array
     data = data - np.min(data)
     if np.max(data) != 0:
         data = data / np.max(data)
-    data = (data * 255).astype(np.uint8)
+    data = (data * 255).astype(data_type)
 
-    data = cv2.resize(data, image_shape, interpolation=cv2.INTER_AREA)
+    if image_shape is not None:
+        if height_range is not None:
+            data = data[np.quantile(np.arange(len(data)), height_range).astype(int), :]
+        if width_range is not None:
+            data = data[:, np.quantile(np.arange(len(data)), height_range).astype(int)]
+        data = cv2.resize(data, image_shape, interpolation=cv2.INTER_AREA)
     return data
 
 

@@ -16,12 +16,11 @@ if __name__ == "__main__":
     print(yaml_path)
 
     cfg = CSFD.data.load_yaml_config(yaml_path)
-    cfg.dataset.type_to_load = "npz"
 
-    model_path = pathlib.Path(
-        cfg.train.model_path) / f"{cfg.model.name}_folds{cfg.dataset.cv.n_folds}_{cfg.train.name_suffix}"
+    model_path = pathlib.Path(cfg.train.model_path) / f"{cfg.model.name}_folds{cfg.dataset.cv.n_folds}_{cfg.train.name_suffix}"
     model_path.mkdir(exist_ok=False, parents=True)
     shutil.copy(yaml_path, model_path)
 
     cfg.train.model_path = model_path
+    print(cfg)
     CSFD.monai.training.train(cfg)
