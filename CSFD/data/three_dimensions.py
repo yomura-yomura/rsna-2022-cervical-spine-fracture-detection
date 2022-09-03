@@ -12,11 +12,9 @@ from . import io as _io_module
 
 def save_all_3d_images(
     images_dir_path, output_dir_path, image_2d_shape, enable_depth_resized_with_cv2, data_type,
+    depth, depth_range,
     uid_list=None, n_jobs=-1
 ):
-    depth = None
-    depth_range = None
-
     images_dir_path = pathlib.Path(images_dir_path)
     output_dir_path = pathlib.Path(output_dir_path)
     output_dir_path.mkdir(parents=True, exist_ok=True)
@@ -53,6 +51,7 @@ def resize_depth(images: np.ndarray, depth, depth_range, enable_depth_resized_wi
     assert images.ndim == 3  # (depth, h/w, w/h)
 
     if depth_range is not None:
+        assert len(depth_range) == 2
         start_idx, end_idx = np.quantile(np.arange(len(images)), depth_range).astype(int)
         images = images[start_idx:end_idx]
 
@@ -63,13 +62,11 @@ def resize_depth(images: np.ndarray, depth, depth_range, enable_depth_resized_wi
         warnings.warn("len(images) < depth", UserWarning)
 
     if enable_depth_resized_with_cv2:
-        # print("cv2 resized")
         return np.stack([
             cv2.resize(image, (depth, image.shape[1]), interpolation=cv2.INTER_AREA)
             for image in np.rollaxis(images, axis=1)
         ], axis=1)
     else:
-        assert len(depth_range) == 2
         indices = np.quantile(
             np.arange(len(images)), np.linspace(0, 1, depth)
         ).astype(int)
@@ -91,7 +88,7 @@ def _get_dicom_paths(dicom_dir_path):
 
 
 def load_3d_images(
-    dicom_dir_path, image_2d_shape, enable_depth_resized_with_cv2, data_type,
+    dicom_dir_path, image_2d_shape=None, enable_depth_resized_with_cv2=True, data_type="f4",
     n_jobs=-1, depth=None, depth_range=(0.1, 0.9)
 ):
     dicom_paths = _get_dicom_paths(dicom_dir_path)
@@ -111,14 +108,40 @@ def load_3d_images(
     return resize_depth(images, depth, depth_range, enable_depth_resized_with_cv2)
 
 
-def get_df(dataset_cfg, ignore_invalids=True):
+def get_df(dataset_cfg, ignore_invalids=True, n_jobs_to_save_images=-1):
     df = _io_module.get_df(dataset_cfg, ignore_invalid=ignore_invalids)
     if dataset_cfg.type_to_load == "npz":
-        depth_dir = dataset_cfg.depth if dataset_cfg.save_images_with_specific_depth else "normal"
+        depth_dir = (
+            "_".join([
+                f"{dataset_cfg.depth}",
+                f"{'-'.join(map(str, dataset_cfg.depth_range))}"
+            ])
+            if dataset_cfg.save_images_with_specific_depth else
+            "normal"
+        )
+        height_dir = (
+            "_".join([
+                f"{dataset_cfg.image_2d_shape[0]}",
+                f"{'-'.join(map(str, dataset_cfg.height_range or [0, 1]))}"
+            ])
+            if dataset_cfg.save_images_with_specific_depth else
+            "normal"
+        )
+        width_dir = (
+            "_".join([
+                f"{dataset_cfg.image_2d_shape[1]}",
+                f"{'-'.join(map(str, dataset_cfg.width_range or [0, 1]))}"
+            ])
+            if dataset_cfg.save_images_with_specific_depth else
+            "normal"
+        )
+
         output_dir_path = (
             pathlib.Path(dataset_cfg.train_3d_images)
             / "_".join(map(str, dataset_cfg.image_2d_shape))
-            / f"{depth_dir}"
+            / depth_dir
+            / height_dir
+            / width_dir
             / np.dtype(dataset_cfg.data_type).name
         )
         save_all_3d_images(
@@ -127,7 +150,9 @@ def get_df(dataset_cfg, ignore_invalids=True):
             image_2d_shape=dataset_cfg.image_2d_shape,
             enable_depth_resized_with_cv2=dataset_cfg.enable_depth_resized_with_cv2,
             data_type=dataset_cfg.data_type,
-            uid_list=df["StudyInstanceUID"]
+            depth=dataset_cfg.depth, depth_range=dataset_cfg.depth_range,
+            uid_list=df["StudyInstanceUID"],
+            n_jobs=n_jobs_to_save_images
         )
         df["np_images_path"] = df["StudyInstanceUID"].map(lambda uid: output_dir_path / f"{uid}.npz")
         if np.all(df["np_images_path"].map(lambda p: p.exists())) == np.False_:

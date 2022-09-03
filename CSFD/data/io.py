@@ -22,25 +22,36 @@ def load_yaml_config(path):
     cfg = omegaconf.OmegaConf.load(path)
     omegaconf.OmegaConf.set_struct(cfg, True)
 
+    def _validate_cfg(cfg, key, default_value):
+        if not hasattr(cfg, key):
+            setattr(cfg, key, default_value)
+
+    # Needed just for compatibility
     with omegaconf.open_dict(cfg):
-        if not hasattr(cfg.dataset, "type_to_load"):
-            cfg.dataset.type_to_load = "npz"
-        if not hasattr(cfg.dataset, "image_2d_shape"):
-            cfg.dataset.image_2d_shape = [256, 256]
-        if not hasattr(cfg.train, "early_stopping"):
-            cfg.train.early_stopping = False
-        if not hasattr(cfg.dataset, "enable_depth_resized_with_cv2"):
-            cfg.dataset.enable_depth_resized_with_cv2 = False
-        if not hasattr(cfg.dataset, "data_type"):
-            cfg.dataset.data_type = "u1"
-        if not hasattr(cfg.dataset, "depth_range"):
-            cfg.dataset.depth_range = [0.1, 0.9]
-        if not hasattr(cfg.dataset, "height_range"):
-            cfg.dataset.height_range = None
-        if not hasattr(cfg.dataset, "width_range"):
-            cfg.dataset.width_range = None
-        if not hasattr(cfg.dataset, "save_images_with_specific_depth"):
-            cfg.dataset.save_images_with_specific_depth = False
+        for cfg_key, default_map_dict in {
+            "dataset": {
+                "type_to_load": "npz",
+                "image_2d_shape": [256, 256],
+                "enable_depth_resized_with_cv2": False,
+                "data_type": "u1",
+                "depth_range": [0.1, 0.9],
+                "height_range": None,
+                "width_range": None,
+                "save_images_with_specific_depth": False,
+            },
+            "model": {
+                "use_multi_sample_dropout": False,
+            },
+            "train": {
+                "early_stopping": False,
+            }
+        }.items():
+            cfg_key = getattr(cfg, cfg_key)
+            for key, default_value in default_map_dict.items():
+                _validate_cfg(cfg_key, key, default_value)
+
+        if cfg.model.name.startswith("resnet"):
+            cfg.model.kwargs = dict(n_input_channels=1)
 
     return cfg
 
@@ -114,18 +125,27 @@ def get_df(dataset_cfg, ignore_invalid=True):
 
 def load_image(dicom_path, image_shape=(256, 256), data_type="u1",
                height_range=None, width_range=None):
+    # data_type = np.dtype(data_type)
+
     dicom = pydicom.read_file(dicom_path)
-    data = dicom.pixel_array
-    data = data - np.min(data)
+    data = dicom.pixel_array.astype("f4")
+    data -= np.min(data)
     if np.max(data) != 0:
-        data = data / np.max(data)
-    data = (data * 255).astype(data_type)
+        data /= np.max(data)
+    data *= 255
+    data = data.astype(data_type)
+    # data = dicom.pixel_array
+    # data = data - np.min(data)
+    # if np.max(data) != 0:
+    #     data = data / np.max(data)
+    # data = (data * 255).astype(data_type)
+
+    if height_range is not None:
+        data = data[np.quantile(np.arange(len(data)), height_range).astype(int), :]
+    if width_range is not None:
+        data = data[:, np.quantile(np.arange(len(data)), height_range).astype(int)]
 
     if image_shape is not None:
-        if height_range is not None:
-            data = data[np.quantile(np.arange(len(data)), height_range).astype(int), :]
-        if width_range is not None:
-            data = data[:, np.quantile(np.arange(len(data)), height_range).astype(int)]
         data = cv2.resize(data, image_shape, interpolation=cv2.INTER_AREA)
     return data
 

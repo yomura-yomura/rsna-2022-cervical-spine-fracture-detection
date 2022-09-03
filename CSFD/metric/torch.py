@@ -23,7 +23,9 @@ def competition_loss(y_hat: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
     """
     loss = loss_fn(y_hat, y)
     weights = y * competition_weights['+'] + (1 - y) * competition_weights['-']
-    return torch.mean(torch.sum(loss * weights / torch.sum(weights, dim=1, keepdim=True), dim=1))
+    return torch.mean(
+        torch.sum(loss * weights / torch.sum(weights, dim=1, keepdim=True), dim=1)
+    )
 
 
 # def competition_loss(y_pred_logit, y, reduction='mean', verbose=False):

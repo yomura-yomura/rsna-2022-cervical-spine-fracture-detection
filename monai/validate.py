@@ -9,14 +9,15 @@ import sys
 
 if __name__ == "__main__":
     if len(sys.argv) == 1:
-        # model_path = "models/resnet10_folds5_test-v3"
+        model_path = "models/resnet10_folds5_test-v3"
         # model_path = "models/resnet10_folds2_test-v1.0"
-        model_path = "models/resnet10_folds4_test-v3.2"
+        # model_path = "models/resnet10_folds4_test-v3.2"
     else:
         model_path = sys.argv[1]
 
     cfg, ckpt_dict = CSFD.monai.from_checkpoint.load_cfg_and_checkpoints(model_path)
     cfg.dataset.type_to_load = "npz"
+    # cfg.dataset.type_to_load = "dcm"
 
     predicted_csv_paths = {
         int(p.name[4:-4]): p

@@ -42,7 +42,7 @@ class CSFDDataset(Dataset):
             if (
                 self.cfg_dataset.target_columns is None
                 or
-                np.any(np.isin(self.cfg_dataset.target_columns, df.columns)) == np.False_
+                np.all(np.isin(self.cfg_dataset.target_columns, df.columns)) == np.False_
             ) else
             df[list(self.cfg_dataset.target_columns)].to_numpy(int)
         )

@@ -3,13 +3,14 @@ import CSFD.monai.training
 import sys
 import pathlib
 import shutil
+print("module loaded", flush=True)
 
 
 if __name__ == "__main__":
     if len(sys.argv) == 1:
-        # yaml_path = "resnet10.yaml"
+        yaml_path = "resnet10.yaml"
         # yaml_path = "resnet50.yaml"
-        yaml_path = "effnet-bn.yaml"
+        # yaml_path = "effnet-bn.yaml"
     else:
         yaml_path = sys.argv[1]
 

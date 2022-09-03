@@ -1,15 +1,26 @@
 dataset:
   type: train
   data_root_path: ../data/rsna-2022-cervical-spine-fracture-detection
-  train_3d_images: ../data/3d_train_images
+  train_3d_images: ../data/3d_train_images_v2
+
+#  data_type: u1
+  data_type: f4
+
+  enable_depth_resized_with_cv2: true
+
+  depth_range: [0.1, 0.9]
+  height_range: null
+  width_range: null
+#  height_range: [0.2, 0.8]
+#  width_range: [0.2, 0.8]
+
   image_2d_shape: [256, 256]
 #  image_2d_shape: [300, 300]
   depth: 128
 #  depth: 200
-  enable_depth_resized_with_cv2: true
-  depth_range: [0.1, 0.9]
-#  data_type: u1
-  data_type: f4
+#  depth: 80
+
+  save_images_with_specific_depth: false
 
   type_to_load: npz
 #  type_to_load: dcm
@@ -22,16 +33,17 @@ dataset:
     fold: null  # null -> run all folds for monai/run.py
 
   num_workers: null  # null -> os.cpu_count()
-  train_batch_size: 2
-  valid_batch_size: 2
+  train_batch_size: 4
+  valid_batch_size: 4
   test_batch_size: 2
+
 
 
 model:
   seed: 42
   name: EfficientNetBN
   kwargs:
-    model_name: efficientnet-b3
+    model_name: efficientnet-b4
     in_channels: 1
     pretrained: true
 
@@ -59,10 +71,11 @@ train:
   learning_rate: 1e-4
   weight_decay: 0
   name_prefix: ""
-  name_suffix: test-v1.0
+
+  name_suffix: test-v4.0
   model_path: models
 
-  early_stopping: false
+  early_stopping: true
 
   validation_interval: 0.2
   evaluate_after_steps: 0

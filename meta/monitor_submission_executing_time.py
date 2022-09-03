@@ -52,13 +52,12 @@ while True:
                 f.write(f"{result}\n")
                 f.flush()
         old_refs = pending_refs
-    # if n_pending == 0:
-    #     print("break")
-    #     break
-    for sub in pending_subs:
-        if sub.status == "pending":
-            print(f"{sub.ref} {sub.fileName} by {sub.submittedBy} ({str(dt.datetime.utcnow() - sub.date).split('.')[0]})")
-    print(flush=True)
+
+    if len(pending_subs) > 0:
+        for sub in pending_subs:
+            if sub.status == "pending":
+                print(f"{sub.ref} {sub.fileName} by {sub.submittedBy} ({str(dt.datetime.utcnow() - sub.date).split('.')[0]})")
+        print(flush=True)
 
     # sys.stdout.flush()
     time.sleep(60)
