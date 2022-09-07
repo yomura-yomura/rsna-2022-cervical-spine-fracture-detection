@@ -1,0 +1,31 @@
+[[source]]
+url = "https://pypi.org/simple"
+verify_ssl = true
+name = "pypi"
+
+[packages]
+monai = "*"
+torchmetrics = "*"
+pydicom = "*"
+pillow = "*"
+transformers = "*"
+pandas = "*"
+omegaconf = "*"
+scikit-learn = "*"
+torch = "*"
+pytorch-lightning = "*"
+numpy = "*"
+scikit-image = "*"
+opencv-python = "*"
+gdcm = "*"
+pylibjpeg = "*"
+pylibjpeg-libjpeg = "*"
+wandb = "*"
+tqdm = "*"
+joblib = "*"
+opencv-python-headless = "*"
+
+[dev-packages]
+
+[requires]
+python_version = "3.9"
