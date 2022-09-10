@@ -10,26 +10,28 @@ dataset:
 
   # Scales to crop images
   depth_range: [0.1, 0.9]
-  height_range: null
-  width_range: null
-#  height_range: [0.2, 0.8]
-#  width_range: [0.2, 0.8]
+#  depth_range: null
+#  height_range: null
+#  width_range: null
+  height_range: [0.1, 0.8]
+  width_range: [0.15, 0.85]
 
   image_2d_shape: [256, 256]
 #  image_2d_shape: [300, 300]
+#  depth: 256
   depth: 128
 #  depth: 200
 #  depth: 80
 
   save_images_with_specific_depth: false
-  save_images_with_specific_height: false
-  save_images_with_specific_width: false
-
+  save_images_with_specific_height: true
+  save_images_with_specific_width: true
 
   type_to_load: npz
 #  type_to_load: dcm
 
   use_normalized_batches: true
+  equalize_adapthist: false  # temp, if true, it takes quite long time
 
   target_columns: [patient_overall, C1, C2, C3, C4, C5, C6, C7]
   cv:
@@ -39,26 +41,26 @@ dataset:
     fold: null  # null -> run all folds for monai/run.py
 
   num_workers: null  # null -> os.cpu_count()
-  train_batch_size: 2
-  valid_batch_size: 2
+  train_batch_size: 8
+  valid_batch_size: 8
   test_batch_size: 2
 
   train_cache_rate: 0
-  valid_cache_rate: 1
+  valid_cache_rate: 0
 
 
 model:
   seed: 42
-  name: resnet10
+  name: SEResNext101
   kwargs:
-     n_input_channels: 1
+    in_channels: 1
 
   use_multi_sample_dropout: false
 
   optimizer:
     name: AdamW
     scheduler:
-      name: null
+#      name: null
 #      name: cosine
 #      kwargs:
 #        num_warmup_steps: 100
@@ -67,11 +69,11 @@ model:
 #      kwargs:
 #        milestones: [300]
 #        gamma: 1e-3
-#      name: CosineAnnealingWarmRestarts
-#      kwargs:
-#        T_0: 100
-#        T_mult: 2
-#        eta_min: 1e-9
+      name: CosineAnnealingWarmRestarts
+      kwargs:
+        T_0: 700
+        T_mult: 1
+        eta_min: 1e-9
 
 
 train:
@@ -82,14 +84,13 @@ train:
 
   seed: 42
 
-  max_epochs: 20
+  max_epochs: 60
 
-  learning_rate: 1e-5
+  learning_rate: 8e-5
   weight_decay: 0
   name_prefix: ""
 
-#  name_suffix: v5.3.1
-  name_suffix: v5.4
+  name_suffix: v5.4.3
 
   model_path: models
 
@@ -110,10 +111,10 @@ train:
         offsets: [-0.1, 0.1]
         prob: 0.5
     affine:
-      rotate_range_in_deg: 15
-      translate_range_in_scale: 0.0625
+      rotate_range_in_deg: [25, 0, 0]
+      translate_range_in_scale: [0, 0.0625, 0.0625]
       kwargs:
         prob: 0.5
-        scale_range: [0.1, 0.1]
+        scale_range: [0, 0.1, 0.1]
         mode: nearest
         padding_mode: reflection

@@ -9,15 +9,16 @@ import sys
 
 if __name__ == "__main__":
     if len(sys.argv) == 1:
-        model_path = "models/resnet10_folds5_test-v3"
+        # model_path = "models/resnet10_folds5_test-v3"
         # model_path = "models/resnet10_folds2_test-v1.0"
         # model_path = "models/resnet10_folds4_test-v3.2"
+        model_path = "models/EfficientNetBN_folds4_test-v4.3"
     else:
         model_path = sys.argv[1]
 
     cfg, ckpt_dict = CSFD.monai.from_checkpoint.load_cfg_and_checkpoints(model_path)
-    cfg.dataset.type_to_load = "npz"
-    # cfg.dataset.type_to_load = "dcm"
+    # cfg.dataset.type_to_load = "npz"
+    cfg.dataset.type_to_load = "dcm"
 
     predicted_csv_paths = {
         int(p.name[4:-4]): p
@@ -31,7 +32,8 @@ if __name__ == "__main__":
             df = CSFD.data.three_dimensions.get_df(cfg.dataset, ignore_invalids=False)
             predicted_df = pd.read_csv(predicted_csv_path)
             df, predicted_df = CSFD.data.io.drop_invalids(df, predicted_df)
-            predicted = predicted_df[df["fold"] == fold].values
+            assert np.all(predicted_df["StudyInstanceUID"] == df["StudyInstanceUID"])
+            predicted = predicted_df[df["fold"] == fold].iloc[:, 1:].to_numpy("f8")
             true = df.loc[df["fold"] == fold, list(cfg.dataset.target_columns)].values
             # predicted[:, 0] = 1 - np.prod(1 - predicted[:, 1:], axis=1)
             cv_list.append(

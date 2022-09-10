@@ -1,10 +1,13 @@
+import warnings
 import pandas as pd
 import sklearn.model_selection
 import omegaconf
 import pathlib
 import numpy as np
 import pydicom
+import pydicom.pixel_data_handlers.util
 import cv2
+import nibabel as nib
 
 
 __all__ = ["load_yaml_config", "get_df", "load_image", "get_submission_df"]
@@ -24,34 +27,61 @@ def load_yaml_config(path):
 
     def _validate_cfg(cfg, key, default_value):
         if not hasattr(cfg, key):
-            setattr(cfg, key, default_value)
+            warnings.warn(
+                f"Given cfg does not have key '{key}'. Tt will be given with default value '{default_value}'",
+                UserWarning
+            )
+            with omegaconf.open_dict(cfg):
+                setattr(cfg, key, default_value)
 
     # Needed just for compatibility
-    with omegaconf.open_dict(cfg):
-        for cfg_key, default_map_dict in {
-            "dataset": {
-                "type_to_load": "npz",
-                "image_2d_shape": [256, 256],
-                "enable_depth_resized_with_cv2": False,
-                "data_type": "u1",
-                "depth_range": [0.1, 0.9],
-                "height_range": None,
-                "width_range": None,
-                "save_images_with_specific_depth": False,
-            },
-            "model": {
-                "use_multi_sample_dropout": False,
-            },
-            "train": {
-                "early_stopping": False,
-            }
-        }.items():
-            cfg_key = getattr(cfg, cfg_key)
-            for key, default_value in default_map_dict.items():
-                _validate_cfg(cfg_key, key, default_value)
+    for cfg_key, default_map_dict in {
+        "dataset": {
+            "type_to_load": "npz",
+            "image_2d_shape": [256, 256],
+            "enable_depth_resized_with_cv2": False,
+            "data_type": "u1",
 
-        if cfg.model.name.startswith("resnet"):
-            cfg.model.kwargs = dict(n_input_channels=1)
+            "depth_range": [0.1, 0.9],
+            "height_range": None,
+            "width_range": None,
+            "save_images_with_specific_depth": False,
+            "save_images_with_specific_height": False,
+            "save_images_with_specific_width": False,
+
+            "use_normalized_batches": False,
+            "equalize_adapthist": False,
+
+            "use_segmentations": False
+        },
+        "model": {
+            "use_multi_sample_dropout": False,
+        },
+        "train": {
+            "early_stopping": False,
+            "augmentation": {}
+        }
+    }.items():
+        cfg_key = getattr(cfg, cfg_key)
+        for key, default_value in default_map_dict.items():
+            _validate_cfg(cfg_key, key, default_value)
+
+    # cfg.model.optimizer.scheduler
+    if not hasattr(cfg.model.optimizer.scheduler, "kwargs"):
+        with omegaconf.open_dict(cfg):
+            cfg.model.optimizer.scheduler.kwargs = dict()
+    if hasattr(cfg.model.optimizer.scheduler, "num_warmup_steps"):
+        with omegaconf.open_dict(cfg):
+            cfg.model.optimizer.scheduler.kwargs["num_warmup_steps"] = cfg.model.optimizer.scheduler.num_warmup_steps
+    if hasattr(cfg.model.optimizer.scheduler, "num_training_steps"):
+        with omegaconf.open_dict(cfg):
+            cfg.model.optimizer.scheduler.kwargs["num_training_steps"] = cfg.model.optimizer.scheduler.num_training_steps
+
+    # cfg.model.name
+    if cfg.model.name.startswith("resnet"):
+        with omegaconf.open_dict(cfg):
+            if not hasattr(cfg.model.kwargs, "n_input_channels"):
+                cfg.model.kwargs = dict(n_input_channels=1)
 
     return cfg
 
@@ -88,6 +118,13 @@ def get_df(dataset_cfg, ignore_invalid=True):
                         n_splits=dataset_cfg.cv.n_folds,
                         shuffle=True, random_state=dataset_cfg.cv.seed
                     )
+                    y = df[list(dataset_cfg.target_columns)]
+                elif dataset_cfg.cv.type == "StratifiedKFold":
+                    kf = sklearn.model_selection.StratifiedKFold(
+                        n_splits=dataset_cfg.cv.n_folds,
+                        shuffle=True, random_state=dataset_cfg.cv.seed
+                    )
+                    y = df["patient_overall"]
                 else:
                     raise NotImplementedError(f"Unexpected dataset_cfg.cv.type: {dataset_cfg.cv.type}")
 
@@ -95,7 +132,7 @@ def get_df(dataset_cfg, ignore_invalid=True):
                 for fold, (_, valid_indices) in enumerate(
                         kf.split(
                             df.drop(columns=dataset_cfg.target_columns),
-                            df[list(dataset_cfg.target_columns)]
+                            y
                         )
                 ):
                     df.loc[valid_indices, "fold"] = fold
@@ -124,30 +161,41 @@ def get_df(dataset_cfg, ignore_invalid=True):
 
 
 def load_image(dicom_path, image_shape=(256, 256), data_type="u1",
-               height_range=None, width_range=None):
+               height_range=None, width_range=None,
+               voi_lut=True, fix_monochrome=True):
     # data_type = np.dtype(data_type)
 
     dicom = pydicom.read_file(dicom_path)
-    data = dicom.pixel_array.astype("f4")
-    data -= np.min(data)
-    if np.max(data) != 0:
-        data /= np.max(data)
-    data *= 255
-    data = data.astype(data_type)
-    # data = dicom.pixel_array
-    # data = data - np.min(data)
-    # if np.max(data) != 0:
-    #     data = data / np.max(data)
-    # data = (data * 255).astype(data_type)
+    if voi_lut:
+        image = pydicom.pixel_data_handlers.util.apply_voi_lut(dicom.pixel_array, dicom).astype("f4")
+    else:
+        image = dicom.pixel_array.astype("f4")
+
+    # depending on this value, X-ray may look inverted - fix that:
+    if fix_monochrome and dicom.PhotometricInterpretation == "MONOCHROME1":
+        print("[Info] fix_monochrome")
+        image = np.amax(image) - image
+
+    image -= np.min(image)
+    if np.max(image) != 0:
+        image /= np.max(image)
+    image *= 255
+    image = image.astype(data_type)
 
     if height_range is not None:
-        data = data[np.quantile(np.arange(len(data)), height_range).astype(int), :]
+        start_ih, end_ih = np.quantile(np.arange(image.shape[0]), height_range).astype(int)
+        image = image[start_ih:end_ih, :]
     if width_range is not None:
-        data = data[:, np.quantile(np.arange(len(data)), height_range).astype(int)]
+        start_iw, end_iw = np.quantile(np.arange(image.shape[1]), width_range).astype(int)
+        image = image[:, start_iw:end_iw]
 
     if image_shape is not None:
-        data = cv2.resize(data, image_shape, interpolation=cv2.INTER_AREA)
-    return data
+        if image.shape[0] < image_shape[0]:
+            warnings.warn("image.shape[0] < given image_shape[0]", UserWarning)
+        if image.shape[1] < image_shape[1]:
+            warnings.warn("image.shape[1] < given image_shape[1]", UserWarning)
+        image = cv2.resize(image, image_shape, interpolation=cv2.INTER_AREA)
+    return image
 
 
 def get_submission_df(dataset_cfg):
@@ -163,3 +211,13 @@ def get_submission_df(dataset_cfg):
         })
 
     return df
+
+
+def load_segmentations(nil_path):
+    nil_file = nib.load(nil_path)
+    segmentations = np.asarray(nil_file.get_fdata(dtype="f2"), dtype="u1")
+    # segmentations[:] = np.flip(segmentations, axis=-1)
+    segmentations[:] = np.rot90(segmentations, axes=(0, 1))
+    segmentations = np.rollaxis(segmentations, axis=-1)
+    segmentations[segmentations > 7] = 0  # exclude labels of T1 to T12
+    return segmentations

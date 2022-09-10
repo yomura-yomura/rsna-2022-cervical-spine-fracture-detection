@@ -1,13 +1,15 @@
 import logging
 from pytorch_lightning import LightningDataModule
 import os
-from typing import Optional
-from torch.utils.data import Dataset, DataLoader
+import torch.utils.data
 import numpy as np
 import pandas as pd
 import torch
 import CSFD.data
 import CSFD.data.three_dimensions
+import CSFD.data.io_with_cfg
+import CSFD.monai.transforms
+from monai.data import CacheDataset, DataLoader
 
 
 __all__ = [
@@ -15,18 +17,12 @@ __all__ = [
 ]
 
 
-class CSFDDataset(Dataset):
+class CSFDDataset(torch.utils.data.Dataset):
     def __init__(
         self,
         df: pd.DataFrame,
         cfg_dataset,
     ):
-        # assert (
-        #     cfg_dataset.target_columns is None
-        #     or
-        #     np.all(np.isin(cfg_dataset.target_columns, df.columns))
-        # )
-
         self.cfg_dataset = cfg_dataset
 
         if self.cfg_dataset.type_to_load == "npz":
@@ -34,7 +30,7 @@ class CSFDDataset(Dataset):
         elif self.cfg_dataset.type_to_load == "dcm":
             self.images_paths = df["dcm_images_path"].to_list()
         else:
-            raise ValueError(cfg_dataset.datatype_to_load)
+            raise ValueError(self.cfg_dataset.datatype_to_load)
 
         self.study_uid_list = df["StudyInstanceUID"].to_list()
         self.target_columns = (
@@ -49,42 +45,19 @@ class CSFDDataset(Dataset):
 
     def __getitem__(self, idx: int) -> dict:
         uid = self.study_uid_list[idx]
-
-        if self.cfg_dataset.type_to_load == "npz":
-            vol = np.load(self.images_paths[idx])["arr_0"]
-            if len(vol) != self.cfg_dataset.depth:
-                vol = CSFD.data.three_dimensions.resize_depth(
-                    vol,
-                    self.cfg_dataset.depth, self.cfg_dataset.depth_range,
-                    self.cfg_dataset.enable_depth_resized_with_cv2
-                )
-        elif self.cfg_dataset.type_to_load == "dcm":
-            vol = CSFD.data.three_dimensions.load_3d_images(
-                self.images_paths[idx],
-                self.cfg_dataset.image_2d_shape,
-                self.cfg_dataset.enable_depth_resized_with_cv2,
-                self.cfg_dataset.data_type,
-                depth=self.cfg_dataset.depth, depth_range=self.cfg_dataset.depth_range,
-                n_jobs=1
-            )
-        else:
-            raise RuntimeError
-
-        assert vol.dtype == np.dtype(self.cfg_dataset.data_type)
-
-        vol = vol[np.newaxis, ...]
-        vol = torch.Tensor(vol).half()
+        images = CSFD.data.io_with_cfg.load_3d_images(self.images_paths[idx], self.cfg_dataset)
+        images = torch.Tensor(images).half()
 
         if self.target_columns[idx] is None:
             return {
                 "uid": uid,
-                "data": vol
+                "data": images
             }
         else:
-            label = torch.Tensor(self.target_columns[idx])
+            label = torch.Tensor(self.target_columns[idx]).half()
             return {
                 "uid": uid,
-                "data": vol,
+                "data": images,
                 "label": label
             }
 
@@ -123,15 +96,25 @@ class CSFDDataModule(LightningDataModule):
 
     def setup(self, stage=None):
         if stage == "fit":
-            self.train_dataset = CSFDDataset(
-                self.df[self.df["fold"] != self.cfg.dataset.cv.fold],
-                self.cfg.dataset
+            # self.train_dataset = CSFDDataset(
+            #     self.df[self.df["fold"] != self.cfg.dataset.cv.fold],
+            #     self.cfg.dataset
+            # )
+            self.train_dataset = CacheDataset(
+                self.df[self.df["fold"] != self.cfg.dataset.cv.fold].to_dict("records"),
+                CSFD.monai.transforms.get_transforms(self.cfg, is_train=True),
+                cache_rate=self.cfg.dataset.train_cache_rate
             )
             logging.info(f"training dataset: {len(self.train_dataset)}")
         if stage in ("fit", "validate"):
-            self.valid_dataset = CSFDDataset(
-                self.df[self.df["fold"] == self.cfg.dataset.cv.fold],
-                self.cfg.dataset
+            # self.valid_dataset = CSFDDataset(
+            #     self.df[self.df["fold"] == self.cfg.dataset.cv.fold],
+            #     self.cfg.dataset
+            # )
+            self.valid_dataset = CacheDataset(
+                self.df[self.df["fold"] == self.cfg.dataset.cv.fold].to_dict("records"),
+                CSFD.monai.transforms.get_transforms(self.cfg, is_train=False),
+                cache_rate=self.cfg.dataset.valid_cache_rate
             )
             logging.info(f"validation dataset: {len(self.valid_dataset)}")
             self.label_names = self.cfg.dataset.target_columns
@@ -142,7 +125,7 @@ class CSFDDataModule(LightningDataModule):
             )
             logging.info(f"test dataset: {len(self.test_dataset)}")
 
-    def train_dataloader(self) -> DataLoader:
+    def train_dataloader(self):
         return DataLoader(
             self.train_dataset,
             shuffle=True,
@@ -151,7 +134,7 @@ class CSFDDataModule(LightningDataModule):
             drop_last=True
         )
 
-    def val_dataloader(self) -> DataLoader:
+    def val_dataloader(self):
         return DataLoader(
             self.valid_dataset,
             shuffle=False,
@@ -160,7 +143,7 @@ class CSFDDataModule(LightningDataModule):
             drop_last=True
         )
 
-    def predict_dataloader(self) -> Optional[DataLoader]:
+    def predict_dataloader(self):
         if not self.test_dataset:
             logging.warning('no testing data found')
             return

@@ -4,28 +4,37 @@ https://www.kaggle.com/competitions/rsna-2022-cervical-spine-fracture-detection/
 import torch
 import torch.nn as nn
 from . import util as _util_module
+# import numpy as np
 
 
 # change it to nn.BCELoss(reduction='none') if you have sigmoid activation in last layer
 loss_fn = nn.BCEWithLogitsLoss(reduction='none')
 # loss_fn = nn.BCELoss(reduction='none')
 
+# def loss_fn(y_hat: torch.Tensor, y: torch.Tensor, eps=1e-6):
+#     y_hat = y_hat.sigmoid().clamp(eps, 1 - eps)
+#     print(y_hat.max(), y_hat.min())
+#     return -(y * torch.log(y_hat) + (1 - y) * torch.log(1 - y_hat))
+
+
 competition_weights = {
-    k: torch.tensor(v, dtype=torch.float, device=torch.device("cuda"))
+    k: torch.tensor(v, dtype=torch.float16)
     for k, v in _util_module.competition_weights.items()
 }
 
 
-def competition_loss(y_hat: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
+def competition_loss_with_logits(y_hat: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
     """
     y_hat.shape = (batch_size, num_classes)
     y.shape = (batch_size, num_classes)
     """
     loss = loss_fn(y_hat, y)
-    weights = y * competition_weights['+'] + (1 - y) * competition_weights['-']
-    return torch.mean(
-        torch.sum(loss * weights / torch.sum(weights, dim=1, keepdim=True), dim=1)
-    )
+    weights = y * competition_weights['+'].cuda() + (1 - y) * competition_weights['-'].cuda()
+    weights /= torch.sum(weights, dim=1, keepdim=True)
+    loss *= weights
+    loss = torch.mean(torch.sum(loss, dim=1))
+    return loss
+    # return (loss * weights).mean()
 
 
 # def competition_loss(y_pred_logit, y, reduction='mean', verbose=False):

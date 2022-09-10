@@ -55,15 +55,15 @@ def validate(cfg, checkpoint_path, df):
     return tl.validate(module, datamodule)[0]["valid/loss"]
 
 
-def predict_all_folds(cfg, ckpt_dict, df):
-    seed_everything(cfg.model.seed)
-
-    predicted_dict = {}
-    for fold, ckpt_path in ckpt_dict.items():
-        print(f"* fold {fold}")
-        cfg.dataset.cv.fold = fold
-        predicted_dict[fold] = predict(cfg, ckpt_path, df)
-    return predicted_dict
+# def predict_all_folds(cfg, ckpt_dict, df):
+#     seed_everything(cfg.model.seed)
+#
+#     predicted_dict = {}
+#     for fold, ckpt_path in ckpt_dict.items():
+#         print(f"* fold {fold}")
+#         cfg.dataset.cv.fold = fold
+#         predicted_dict[fold] = predict(cfg, ckpt_path, df)
+#     return predicted_dict
 
 
 def predict(cfg, ckpt_path, df):
@@ -81,24 +81,57 @@ def predict(cfg, ckpt_path, df):
     return predicted
 
 
-def predict_on_datamodule_wide(cfg, ckpt_dict, df):
-    modules = {
-        fold: CSFD.monai.CSFDModule.load_from_checkpoint(
-            str(ckpt_path), cfg=cfg, map_location=torch.device("cuda")
-        ).cuda().half()
-        for fold, ckpt_path in ckpt_dict.items()
+def predict_on_datamodule_wide(cfg, ckpt_dict, df, common_cfg_dataset, show_progress=True):
+    if isinstance(cfg, list) or isinstance(ckpt_dict, list):
+        assert isinstance(cfg, list) and isinstance(ckpt_dict, list)
+        assert len(cfg) == len(ckpt_dict)
+
+        ckpt_dict_list = ckpt_dict
+        ckpt_dict = {
+            fold: [ckpt_dict[fold] for ckpt_dict in ckpt_dict_list]
+            for fold in set.intersection(*(set(ckpt_dict.keys()) for ckpt_dict in ckpt_dict_list))
+        }
+    else:
+        ckpt_dict = {
+            fold: [ckpt_path]
+            for fold, ckpt_path in ckpt_dict.items()
+        }
+
+    cfg_list = [cfg] if not isinstance(cfg, list) else cfg
+
+    modules_dict = {
+        fold: [
+            CSFD.monai.CSFDModule.load_from_checkpoint(
+                str(ckpt_path), cfg=cfg, map_location=torch.device("cuda")
+            ).cuda().half()
+            for ckpt_path, cfg in zip(ckpt_path_list, cfg_list)
+        ]
+        for fold, ckpt_path_list in ckpt_dict.items()
     }
-    datamodule = CSFD.monai.CSFDDataModule(cfg, df)
+    for modules in modules_dict.values():
+        for module in modules:
+            module.eval()
+
+    datamodule = CSFD.monai.CSFDDataModule(common_cfg_dataset, df)
 
     datamodule.setup("predict")
-    for batch in tqdm.tqdm(datamodule.predict_dataloader(), desc="predict"):
+    dataloader = (
+        tqdm.tqdm(datamodule.predict_dataloader(), desc="predict")
+        if show_progress else
+        datamodule.predict_dataloader()
+    )
+
+    for batch in dataloader:
         predicted_list = []
-        for fold, module in modules.items():
-            with torch.no_grad():
-                p = module.model.forward(
-                    batch["data"].cuda()
-                ).sigmoid()
-            predicted_list.append(p.cpu().numpy())
+        for fold, modules in modules_dict.items():
+            predicted_per_module_list = []
+            for module in modules:
+                with torch.no_grad():
+                    p = module.forward(
+                        {"data": batch["data"].cuda()}
+                    ).sigmoid()
+                    predicted_per_module_list.append(p.cpu().numpy())
+            predicted_list.append(predicted_per_module_list)
         yield batch, predicted_list
 
 

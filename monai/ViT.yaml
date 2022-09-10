@@ -1,13 +1,14 @@
 dataset:
   type: train
   data_root_path: ../data/rsna-2022-cervical-spine-fracture-detection
-  train_3d_images: ../data/3d_train_images_v2
+  train_3d_images: ../data/3d_train_images_v3
 
 #  data_type: u1
   data_type: f4
 
   enable_depth_resized_with_cv2: true
 
+  # Scales to crop images
   depth_range: [0.1, 0.9]
   height_range: null
   width_range: null
@@ -22,10 +23,10 @@ dataset:
 
   save_images_with_specific_depth: false
 
-  use_normalized_batches: true
-
   type_to_load: npz
 #  type_to_load: dcm
+
+  use_normalized_batches: true
 
   target_columns: [patient_overall, C1, C2, C3, C4, C5, C6, C7]
   cv:
@@ -35,34 +36,47 @@ dataset:
     fold: null  # null -> run all folds for monai/run.py
 
   num_workers: null  # null -> os.cpu_count()
-  train_batch_size: 4
-  valid_batch_size: 4
-#  test_batch_size: 4
+  train_batch_size: 2
+  valid_batch_size: 2
+  test_batch_size: 2
 
+  train_cache_rate: 0
+  valid_cache_rate: 1
 
 
 model:
   seed: 42
-  name: EfficientNetBN
+  name: ViT
   kwargs:
-    model_name: efficientnet-b8
     in_channels: 1
-    pretrained: true
+    img_size: [128, 256, 256]
+    patch_size: [16, 32, 32]
+    classification: true
+    pos_embed: conv
+    post_activation: null
+
+    num_layers: 24
+    num_heads: 24
 
   use_multi_sample_dropout: false
 
   optimizer:
     name: AdamW
     scheduler:
-#      name: null
-      name: cosine
-      kwargs:
-        num_warmup_steps: 100
-        num_training_steps: 500
+      name: null
+#      name: cosine
+#      kwargs:
+#        num_warmup_steps: 100
+#        num_training_steps: 500
 #      name: MultiStep
 #      kwargs:
 #        milestones: [300]
 #        gamma: 1e-3
+#      name: CosineAnnealingWarmRestarts
+#      kwargs:
+#        T_0: 100
+#        T_mult: 2
+#        eta_min: 1e-9
 
 
 train:
@@ -73,22 +87,38 @@ train:
 
   seed: 42
 
-#  max_epochs: 5
-  max_epochs: 15
+  max_epochs: 20
 
-#  learning_rate: 1e-4
-  learning_rate: 1e-5
+  learning_rate: 1e-4
   weight_decay: 0
   name_prefix: ""
 
-  name_suffix: b8-v5.0
+#  name_suffix: v5.3.1
+  name_suffix: v5.4.2
+
   model_path: models
 
-#  early_stopping: true
   early_stopping: false
 
   validation_interval: 0.2
   evaluate_after_steps: 0
-#  evaluate_after_steps: 1500
 
   logging_interval: 10
+
+  augmentation:
+    scale_intensity:
+      kwargs:
+        factors: [-0.2, 0.2]
+        prob: 0.5
+    shift_intensity:
+      kwargs:
+        offsets: [-0.1, 0.1]
+        prob: 0.5
+    affine:
+      rotate_range_in_deg: 15
+      translate_range_in_scale: 0.0625
+      kwargs:
+        prob: 0.5
+        scale_range: [0.1, 0.1]
+        mode: nearest
+        padding_mode: reflection

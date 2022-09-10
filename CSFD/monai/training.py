@@ -6,11 +6,16 @@ from pytorch_lightning import Trainer, seed_everything
 from pytorch_lightning.callbacks import LearningRateMonitor, ModelCheckpoint, EarlyStopping
 from pytorch_lightning.loggers import WandbLogger
 import pathlib
+from collections.abc import Iterable
 
 
 def train(cfg):
     if cfg.dataset.cv.fold is None:
-        for fold in range(cfg.dataset.cv.n_folds):
+        cfg.dataset.cv.fold = list(range(cfg.dataset.cv.n_folds))
+        train(cfg)
+        return
+    elif isinstance(cfg.dataset.cv.fold, Iterable):
+        for fold in cfg.dataset.cv.fold:
             print(f"* fold {fold}")
             cfg.dataset.cv.fold = fold
             train(cfg)

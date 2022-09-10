@@ -14,7 +14,7 @@ if __name__ == "__main__":
     else:
         yaml_path = sys.argv[1]
 
-    print(yaml_path)
+    # print(yaml_path)
 
     cfg = CSFD.data.load_yaml_config(yaml_path)
 
