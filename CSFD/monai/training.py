@@ -27,7 +27,15 @@ def train(cfg):
     module = CSFD.monai.CSFDModule(cfg)
     datamodule = CSFD.monai.CSFDDataModule(cfg, df)
 
-    name = f"{cfg.train.name_prefix}{cfg.model.name}_fold{cfg.dataset.cv.fold}-of-{cfg.dataset.cv.n_folds}_{cfg.train.name_suffix}"
+    name = "_".join(
+        [
+            f"{cfg.train.name_prefix}{cfg.model.name}",
+            f"fold{cfg.dataset.cv.fold}-of-{cfg.dataset.cv.n_folds}",
+            *(
+                [cfg.train.name_suffix] if cfg.train.name_suffix else []
+            )
+        ]
+    )
 
     callbacks = [
         ModelCheckpoint(
