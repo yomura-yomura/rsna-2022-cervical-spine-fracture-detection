@@ -1,0 +1,11 @@
+Metadata-Version: 2.1
+Name: csfd
+Version: 0.0.1
+Summary: FPE
+Home-page: https://github.com
+Author: ranchantan
+Author-email: propella@example.com
+Requires-Python: >=3.7
+Description-Content-Type: text/markdown
+
+# rsna-2022-cervical-spine-fracture-detection
