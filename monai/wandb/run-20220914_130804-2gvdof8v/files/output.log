@@ -1,0 +1,108 @@
+Using 16bit native Automatic Mixed Precision (AMP)
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+IPU available: False, using: 0 IPUs
+HPU available: False, using: 0 HPUs
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Loading dataset:  51%|█████████████████████████████████████████████████████████████████████████████▏                                                                        | 260/505 [01:11<01:14,  3.30it/s]/home/jumpei.uchida/.local/share/virtualenvs/rsna-2022-cervical-spine-fracture-detectio--CY1vaQI/lib/python3.9/site-packages/CSFD/data/io_with_cfg.py:15: UserWarning: not expected type: float64
+  warnings.warn(f"not expected type: {images.dtype}")
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Loading dataset: 100%|█████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████▋| 504/505 [02:22<00:00,  3.51it/s]
+Loading dataset: 100%|██████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 505/505 [02:22<00:00,  3.55it/s]
+Traceback (most recent call last):
+  File "/home/jumpei.uchida/develop/kaggle_1080ti_1_0/rsna-2022-cervical-spine-fracture-detection/monai/train.py", line 27, in <module>
+    CSFD.monai.training.train(cfg)
+  File "/home/jumpei.uchida/.local/share/virtualenvs/rsna-2022-cervical-spine-fracture-detectio--CY1vaQI/lib/python3.9/site-packages/CSFD/monai/training.py", line 15, in train
+    train(cfg)
+  File "/home/jumpei.uchida/.local/share/virtualenvs/rsna-2022-cervical-spine-fracture-detectio--CY1vaQI/lib/python3.9/site-packages/CSFD/monai/training.py", line 21, in train
+    train(cfg)
+  File "/home/jumpei.uchida/.local/share/virtualenvs/rsna-2022-cervical-spine-fracture-detectio--CY1vaQI/lib/python3.9/site-packages/CSFD/monai/training.py", line 78, in train
+    tl.fit(module, datamodule)
+  File "/home/jumpei.uchida/.local/share/virtualenvs/rsna-2022-cervical-spine-fracture-detectio--CY1vaQI/lib/python3.9/site-packages/pytorch_lightning/trainer/trainer.py", line 696, in fit
+    self._call_and_handle_interrupt(
+  File "/home/jumpei.uchida/.local/share/virtualenvs/rsna-2022-cervical-spine-fracture-detectio--CY1vaQI/lib/python3.9/site-packages/pytorch_lightning/trainer/trainer.py", line 650, in _call_and_handle_interrupt
+    return trainer_fn(*args, **kwargs)
+  File "/home/jumpei.uchida/.local/share/virtualenvs/rsna-2022-cervical-spine-fracture-detectio--CY1vaQI/lib/python3.9/site-packages/pytorch_lightning/trainer/trainer.py", line 735, in _fit_impl
+    results = self._run(model, ckpt_path=self.ckpt_path)
+  File "/home/jumpei.uchida/.local/share/virtualenvs/rsna-2022-cervical-spine-fracture-detectio--CY1vaQI/lib/python3.9/site-packages/pytorch_lightning/trainer/trainer.py", line 1105, in _run
+    self._call_setup_hook()  # allow user to setup lightning_module in accelerator environment
+  File "/home/jumpei.uchida/.local/share/virtualenvs/rsna-2022-cervical-spine-fracture-detectio--CY1vaQI/lib/python3.9/site-packages/pytorch_lightning/trainer/trainer.py", line 1449, in _call_setup_hook
+    self._call_lightning_module_hook("setup", stage=fn)
+  File "/home/jumpei.uchida/.local/share/virtualenvs/rsna-2022-cervical-spine-fracture-detectio--CY1vaQI/lib/python3.9/site-packages/pytorch_lightning/trainer/trainer.py", line 1550, in _call_lightning_module_hook
+    output = fn(*args, **kwargs)
+  File "/home/jumpei.uchida/.local/share/virtualenvs/rsna-2022-cervical-spine-fracture-detectio--CY1vaQI/lib/python3.9/site-packages/CSFD/monai/module.py", line 77, in setup
+    for k, v in torch.load("../MedicalNet/pretrain/resnet_10_23dataset.pth")["state_dict"].items()
+  File "/home/jumpei.uchida/.local/share/virtualenvs/rsna-2022-cervical-spine-fracture-detectio--CY1vaQI/lib/python3.9/site-packages/torch/serialization.py", line 699, in load
+    with _open_file_like(f, 'rb') as opened_file:
+  File "/home/jumpei.uchida/.local/share/virtualenvs/rsna-2022-cervical-spine-fracture-detectio--CY1vaQI/lib/python3.9/site-packages/torch/serialization.py", line 230, in _open_file_like
+    return _open_file(name_or_buffer, mode)
+  File "/home/jumpei.uchida/.local/share/virtualenvs/rsna-2022-cervical-spine-fracture-detectio--CY1vaQI/lib/python3.9/site-packages/torch/serialization.py", line 211, in __init__
+    super(_open_file, self).__init__(open(name, mode))
+FileNotFoundError: [Errno 2] No such file or directory: '../MedicalNet/pretrain/resnet_10_23dataset.pth'

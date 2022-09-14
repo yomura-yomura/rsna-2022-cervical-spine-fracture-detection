@@ -29,3 +29,5 @@ csfd.egg-info/SOURCES.txt
 csfd.egg-info/dependency_links.txt
 csfd.egg-info/requires.txt
 csfd.egg-info/top_level.txt
+effnet/__init__.py
+effnet/utils.py

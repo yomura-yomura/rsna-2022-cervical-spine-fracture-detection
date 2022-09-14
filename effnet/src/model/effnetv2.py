@@ -178,19 +178,19 @@ def gen_effnet_predictions(effnet_models, df_train):
         with tqdm(enumerate(effnet_models), total=len(effnet_models), desc='Folds') as progress:
             for fold, effnet_model in progress:
                 ds_eval = effnet_data.EffnetDataSet(df_train.query('split == @fold'), TRAIN_IMAGES_PATH, WEIGHTS.transforms())
-                #ds_train = effnet_data.EffnetDataSet(df_train.query('split != @fold'), TRAIN_IMAGES_PATH, WEIGHTS.transforms())
+                ds_train = effnet_data.EffnetDataSet(df_train.query('split != @fold'), TRAIN_IMAGES_PATH, WEIGHTS.transforms())
 
                 #train_prediction
-                #train_frac_loss, train_vert_loss, train_effnet_pred_frac, train_effnet_pred_vert = evaluate_effnet(effnet_model, ds_train, PREDICT_MAX_BATCHES)
-                #progress.set_description(f'Fold score:{train_frac_loss:.02f}')
-                #df_train_effnet_pred = pd.DataFrame(data=np.concatenate([train_effnet_pred_frac, train_effnet_pred_vert], axis=1),
-                #                              columns=[f'C{i}_effnet_frac' for i in range(1, 8)] +
-                #                                      [f'C{i}_effnet_vert' for i in range(1, 8)])
-                #df_train = pd.concat(
-                #    [df_train.query('split != @fold').head(len(df_train_effnet_pred)).reset_index(drop=True), df_train_effnet_pred],
-                #    axis=1
-                #).sort_values(['StudyInstanceUID', 'Slice'])
-                #df_train_predictions.append(df_train)
+                train_frac_loss, train_vert_loss, train_effnet_pred_frac, train_effnet_pred_vert = evaluate_effnet(effnet_model, ds_train, PREDICT_MAX_BATCHES)
+                progress.set_description(f'Fold score:{train_frac_loss:.02f}')
+                df_train_effnet_pred = pd.DataFrame(data=np.concatenate([train_effnet_pred_frac, train_effnet_pred_vert], axis=1),
+                                              columns=[f'C{i}_effnet_frac' for i in range(1, 8)] +
+                                                      [f'C{i}_effnet_vert' for i in range(1, 8)])
+                df_train = pd.concat(
+                    [df_train.query('split != @fold').head(len(df_train_effnet_pred)).reset_index(drop=True), df_train_effnet_pred],
+                    axis=1
+                ).sort_values(['StudyInstanceUID', 'Slice'])
+                df_train_predictions.append(df_train)
 
                 #valid_prediction
                 eval_frac_loss, eval_vert_loss, eval_effnet_pred_frac, eval_effnet_pred_vert = evaluate_effnet(effnet_model, ds_eval, PREDICT_MAX_BATCHES)
@@ -205,13 +205,13 @@ def gen_effnet_predictions(effnet_models, df_train):
                 ).sort_values(['StudyInstanceUID', 'Slice'])
                 df_eval_predictions.append(df_eval)
 
-        #df_train_predictions = pd.concat(df_train_predictions)
+        df_train_predictions = pd.concat(df_train_predictions)
         df_eval_predictions = pd.concat(df_eval_predictions)
 
-        #df_train_predictions.to_csv(f'{EFFNET_CHECKPOINTS_PATH}/{MODEL_NAME}_train_prediction.csv')
+        df_train_predictions.to_csv(f'{EFFNET_CHECKPOINTS_PATH}/{MODEL_NAME}_train_prediction.csv')
         df_eval_predictions.to_csv(f'{EFFNET_CHECKPOINTS_PATH}/{MODEL_NAME}_eval_prediction.csv')
-        #df_train_predictions
-    return df_eval_predictions
+        #
+    return df_train_predictions,df_eval_predictions
 
 def patient_prediction(df,frac_cols,vert_cols):
     c1c7 = np.average(df[frac_cols].values, axis=0, weights=df[vert_cols].values)
@@ -220,21 +220,21 @@ def patient_prediction(df,frac_cols,vert_cols):
 
 def evaluate(effnet_models,df_train):
     
-    df_eval_pred = gen_effnet_predictions(effnet_models=effnet_models,df_train=df_train)
+    df_train_pred,df_eval_pred = gen_effnet_predictions(effnet_models=effnet_models,df_train=df_train)
     target_cols = ['patient_overall'] + [f'C{i}_fracture' for i in range(1, 8)]
     frac_cols = [f'C{i}_effnet_frac' for i in range(1, 8)]
     vert_cols = [f'C{i}_effnet_vert' for i in range(1, 8)]
 
-    #df_patient_train_pred = df_train_pred.groupby('StudyInstanceUID').apply(lambda df: patient_prediction(df,vert_cols=vert_cols)).to_frame('pred').join(df_train_pred.groupby('StudyInstanceUID')[target_cols].mean())
+    df_patient_train_pred = df_train_pred.groupby('StudyInstanceUID').apply(lambda df: patient_prediction(df,vert_cols=vert_cols)).to_frame('pred').join(df_train_pred.groupby('StudyInstanceUID')[target_cols].mean())
     df_patient_eval_pred = df_eval_pred.groupby('StudyInstanceUID').apply(lambda df: patient_prediction(df,frac_cols=frac_cols,vert_cols=vert_cols)).to_frame('pred').join(df_eval_pred.groupby('StudyInstanceUID')[target_cols].mean())
 
-    #train_targets = df_patient_train_pred[target_cols].values
-    #train_predictions = np.stack(df_patient_train_pred.pred.values.tolist())
+    train_targets = df_patient_train_pred[target_cols].values
+    train_predictions = np.stack(df_patient_train_pred.pred.values.tolist())
 
     eval_targets = df_patient_eval_pred[target_cols].values
     eval_predictions = np.stack(df_patient_eval_pred.pred.values.tolist())
 
-    #print('Train_CV score:', custom_metric.weighted_loss(torch.logit(torch.as_tensor(train_predictions)).to(DEVICE), torch.as_tensor(train_targets).to(DEVICE)))
+    print('Train_CV score:', custom_metric.weighted_loss(torch.logit(torch.as_tensor(train_predictions)).to(DEVICE), torch.as_tensor(train_targets).to(DEVICE)))
     print('Valid_CV score:', custom_metric.weighted_loss(torch.logit(torch.as_tensor(eval_predictions)).to(DEVICE), torch.as_tensor(eval_targets).to(DEVICE)))
 
 # N-fold models. Can be used to estimate accurate CV score and in ensembled submissions.
