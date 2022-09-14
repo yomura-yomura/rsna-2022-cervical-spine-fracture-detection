@@ -106,12 +106,14 @@ def load_3d_images(
 
     if n_jobs == 1:
         images = [
-            _io_module.load_image(dicom_path, image_2d_shape, data_type, height_range, width_range)
+            _io_module.load_image(dicom_path, image_2d_shape, data_type, height_range, width_range, voi_lut)
             for dicom_path in dicom_paths
         ]
     else:
         images = joblib.Parallel(n_jobs=n_jobs)(
-            joblib.delayed(_io_module.load_image)(dicom_path, image_2d_shape, data_type, height_range, width_range)
+            joblib.delayed(_io_module.load_image)(
+                dicom_path, image_2d_shape, data_type, height_range, width_range, voi_lut
+            )
             for dicom_path in dicom_paths
         )
     images = np.stack(images, axis=0)

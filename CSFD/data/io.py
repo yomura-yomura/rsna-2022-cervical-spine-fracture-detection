@@ -173,7 +173,7 @@ def get_df(dataset_cfg, ignore_invalid=True):
 
 def load_image(dicom_path, image_shape=(256, 256), data_type="u1",
                height_range=None, width_range=None,
-               voi_lut=True, fix_monochrome=True):
+               voi_lut=False, fix_monochrome=True):
     # data_type = np.dtype(data_type)
 
     dicom = pydicom.read_file(dicom_path)
