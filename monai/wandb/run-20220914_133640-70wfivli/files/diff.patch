@@ -1,0 +1,27 @@
+diff --git a/monai/wandb/debug-internal.log b/monai/wandb/debug-internal.log
+index 67be4ab..9774b9a 120000
+--- a/monai/wandb/debug-internal.log
++++ b/monai/wandb/debug-internal.log
+@@ -1 +1 @@
+-run-20220914_131110-2oqna1c6/logs/debug-internal.log
+\ No newline at end of file
++run-20220914_133640-70wfivli/logs/debug-internal.log
+\ No newline at end of file
+diff --git a/monai/wandb/debug.log b/monai/wandb/debug.log
+index effedd7..3bc7fdd 120000
+--- a/monai/wandb/debug.log
++++ b/monai/wandb/debug.log
+@@ -1 +1 @@
+-run-20220914_131110-2oqna1c6/logs/debug.log
+\ No newline at end of file
++run-20220914_133640-70wfivli/logs/debug.log
+\ No newline at end of file
+diff --git a/monai/wandb/latest-run b/monai/wandb/latest-run
+index 2c730bd..6e0e96e 120000
+--- a/monai/wandb/latest-run
++++ b/monai/wandb/latest-run
+@@ -1 +1 @@
+-run-20220914_131110-2oqna1c6
+\ No newline at end of file
++run-20220914_133640-70wfivli
+\ No newline at end of file

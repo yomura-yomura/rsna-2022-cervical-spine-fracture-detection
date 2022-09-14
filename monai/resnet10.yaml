@@ -44,12 +44,13 @@ dataset:
   test_batch_size: 2
 
   train_cache_rate: 0
-  valid_cache_rate: 1
+  valid_cache_rate: 0
 
 
 model:
   seed: 42
   name: resnet10
+  use_medical_net: false
   kwargs:
      n_input_channels: 1
 

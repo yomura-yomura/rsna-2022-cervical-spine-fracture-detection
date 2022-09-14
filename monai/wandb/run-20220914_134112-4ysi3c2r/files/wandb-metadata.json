@@ -1,0 +1,24 @@
+{
+    "os": "Linux-5.4.0-97-generic-x86_64-with-glibc2.31",
+    "python": "3.9.12",
+    "heartbeatAt": "2022-09-14T13:41:13.120860",
+    "startedAt": "2022-09-14T13:41:12.394555",
+    "docker": null,
+    "gpu": "NVIDIA GeForce GTX 1080 Ti",
+    "gpu_count": 1,
+    "cpu_count": 12,
+    "cuda": null,
+    "args": [],
+    "state": "running",
+    "program": "/home/jumpei.uchida/develop/kaggle_1080ti_1_0/rsna-2022-cervical-spine-fracture-detection/monai/train.py",
+    "codePath": "monai/train.py",
+    "git": {
+        "remote": "https://github.com/yomura-yomura/rsna-2022-cervical-spine-fracture-detection.git",
+        "commit": "826a5d3d68faaef43788b99e0ebcfdad69e14174"
+    },
+    "email": "jumpei.uchida@brainpad.co.jp",
+    "root": "/home/jumpei.uchida/develop/kaggle_1080ti_1_0/rsna-2022-cervical-spine-fracture-detection",
+    "host": "gpu-1080ti-1-0-jumpei-uchida",
+    "username": "jumpei.uchida",
+    "executable": "/home/jumpei.uchida/.local/share/virtualenvs/rsna-2022-cervical-spine-fracture-detectio--CY1vaQI/bin/python"
+}

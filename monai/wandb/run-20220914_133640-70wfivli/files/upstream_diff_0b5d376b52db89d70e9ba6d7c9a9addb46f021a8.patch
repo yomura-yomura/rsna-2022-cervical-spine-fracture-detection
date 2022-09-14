@@ -1,0 +1,1302 @@
+diff --git a/CSFD/bounding_box/__init__.py b/CSFD/bounding_box/__init__.py
+new file mode 100644
+index 0000000..46d3a15
+--- /dev/null
++++ b/CSFD/bounding_box/__init__.py
+@@ -0,0 +1 @@
++from .util import *
+diff --git a/CSFD/bounding_box/util.py b/CSFD/bounding_box/util.py
+new file mode 100644
+index 0000000..4c8a77f
+--- /dev/null
++++ b/CSFD/bounding_box/util.py
+@@ -0,0 +1,8 @@
++import numpy as np
++
++
++def get_3d_bounding_box(masks: np.ndarray):
++    assert masks.ndim == 3
++    indices = np.argwhere(masks)
++    bb = np.stack([indices.min(axis=0), indices.max(axis=0)], axis=1)
++    return bb
+diff --git a/CSFD/data/io.py b/CSFD/data/io.py
+index fdfa52d..f36e0e9 100644
+--- a/CSFD/data/io.py
++++ b/CSFD/data/io.py
+@@ -33,6 +33,15 @@ def load_yaml_config(path):
+             )
+             with omegaconf.open_dict(cfg):
+                 setattr(cfg, key, default_value)
++    def _update_recursively_if_not_defined(cfg: dict, base_cfg: dict):
++        for k, v in base_cfg.items():
++            if getattr(cfg, k, None) is None:
++                continue
++            if not isinstance(getattr(cfg, k), dict):
++                assert isinstance(v, dict)
++                _update_recursively_if_not_defined(getattr(cfg, k), v)
++                continue
++            setattr(cfg, k, v)
+ 
+     # Needed just for compatibility
+     for cfg_key, default_map_dict in {
+@@ -52,10 +61,12 @@ def load_yaml_config(path):
+             "use_normalized_batches": False,
+             "equalize_adapthist": False,
+ 
+-            "use_segmentations": False
++            "use_segmentations": False,
++            "train_segmentations_path": None
+         },
+         "model": {
+             "use_multi_sample_dropout": False,
++            "use_medical_net": False
+         },
+         "train": {
+             "early_stopping": False,
+@@ -190,14 +201,19 @@ def load_image(dicom_path, image_shape=(256, 256), data_type="u1",
+         image = image[:, start_iw:end_iw]
+ 
+     if image_shape is not None:
+-        if image.shape[0] < image_shape[0]:
+-            warnings.warn("image.shape[0] < given image_shape[0]", UserWarning)
+-        if image.shape[1] < image_shape[1]:
+-            warnings.warn("image.shape[1] < given image_shape[1]", UserWarning)
+-        image = cv2.resize(image, image_shape, interpolation=cv2.INTER_AREA)
++        image = resize_hw(image, image_shape)
+     return image
+ 
+ 
++def resize_hw(image, image_shape):
++    assert image.ndim == 2  # (h/w, w/h)
++    if image.shape[-2] < image_shape[1]:
++        warnings.warn("image.shape[-2] < given image_shape[1]", UserWarning)
++    if image.shape[-1] < image_shape[0]:
++        warnings.warn("image.shape[-1] < given image_shape[0]", UserWarning)
++    return cv2.resize(image, (image_shape[1], image_shape[0]), interpolation=cv2.INTER_AREA)
++
++
+ def get_submission_df(dataset_cfg):
+     df = pd.read_csv(pathlib.Path(dataset_cfg.data_root_path) / "sample_submission.csv")
+     if len(df) == 3:
+@@ -213,11 +229,21 @@ def get_submission_df(dataset_cfg):
+     return df
+ 
+ 
+-def load_segmentations(nil_path):
++def load_segmentations(nil_path, separate_in_channels=False):
+     nil_file = nib.load(nil_path)
+     segmentations = np.asarray(nil_file.get_fdata(dtype="f2"), dtype="u1")
+     # segmentations[:] = np.flip(segmentations, axis=-1)
+     segmentations[:] = np.rot90(segmentations, axes=(0, 1))
+     segmentations = np.rollaxis(segmentations, axis=-1)
+     segmentations[segmentations > 7] = 0  # exclude labels of T1 to T12
++
++    if separate_in_channels:
++        segmentations = np.stack(
++            [segmentations == label for label in np.unique(segmentations[segmentations > 0])],
++            axis=0
++        )
++        segmentations = segmentations.astype("u1")
++
++    segmentations *= 255
++
+     return segmentations
+diff --git a/CSFD/data/three_dimensions.py b/CSFD/data/three_dimensions.py
+index f607471..41aae02 100644
+--- a/CSFD/data/three_dimensions.py
++++ b/CSFD/data/three_dimensions.py
+@@ -50,29 +50,35 @@ def save_all_3d_images(
+ 
+ 
+ def resize_depth(images: np.ndarray, depth, depth_range, enable_depth_resized_with_cv2):
+-    assert images.ndim == 3  # (depth, h/w, w/h)
++    assert images.ndim >= 3  # (..., depth, h/w, w/h)
+ 
+     if depth_range is not None:
+         assert len(depth_range) == 2
+-        start_idx, end_idx = np.quantile(np.arange(len(images)), depth_range).astype(int)
+-        images = images[start_idx:end_idx]
++        start_idx, end_idx = np.quantile(np.arange(images.shape[-3]), depth_range).astype(int)
++        images = images[..., start_idx:end_idx, :, :]
+ 
+     if depth is None:
+         return images
+ 
+-    if len(images) < depth:
+-        warnings.warn("len(images) < given depth", UserWarning)
++    if images.shape[-3] < depth:
++        warnings.warn("images.shape[-3] < given depth", UserWarning)
+ 
+     if enable_depth_resized_with_cv2:
+-        return np.stack([
+-            cv2.resize(image, (image.shape[1], depth), interpolation=cv2.INTER_AREA)
+-            for image in np.rollaxis(images, axis=1)
+-        ], axis=1)
++        images = images.swapaxes(-3, -2)
++        *left_shapes, images_height, images_depth, images_width = images.shape
++        images = images.reshape((-1, images_depth, images_width))
++        images = np.stack([
++            cv2.resize(image, (images_width, depth), interpolation=cv2.INTER_AREA)
++            for image in images
++        ], axis=0)
++        images = images.reshape((*left_shapes, images_height, depth, images_width))
++        images = images.swapaxes(-3, -2)
++        return images
+     else:
+         indices = np.quantile(
+-            np.arange(len(images)), np.linspace(0, 1, depth)
++            np.arange(images.shape[-3]), np.linspace(0, 1, depth)
+         ).astype(int)
+-        return images[indices]
++        return images[..., indices, :, :]
+ 
+ 
+ def _get_dicom_paths(dicom_dir_path: pathlib.Path):
+@@ -118,9 +124,14 @@ def get_df(cfg_dataset, ignore_invalids=True, n_jobs_to_save_images=-1):
+ 
+     if cfg_dataset.use_segmentations:
+         for p in (pathlib.Path(cfg_dataset.data_root_path) / "segmentations").glob("*.nii"):
+-            df.loc[df["StudyInstanceUID"] == p.name[:-4], "nil_images_path"] = p
++            df.loc[df["StudyInstanceUID"] == p.name[:-4], "nil_segmentations_path"] = p
+         df = df.dropna()
+ 
++    if cfg_dataset.train_segmentations_path:
++        train_segmentations_path = pathlib.Path(cfg_dataset.train_segmentations_path)
++        df["npz_segmentations_path"] = [train_segmentations_path / f"{uid}.npz" for uid in df["StudyInstanceUID"]]
++        assert all(p.exists() for p in df["npz_segmentations_path"]), "some segmentations files not found"
++
+     if cfg_dataset.type_to_load == "npz":
+         depth_dir = (
+             "_".join([
+diff --git a/CSFD/monai/datamodule.py b/CSFD/monai/datamodule.py
+index b046dd5..e9dec02 100644
+--- a/CSFD/monai/datamodule.py
++++ b/CSFD/monai/datamodule.py
+@@ -66,13 +66,15 @@ class CSFDDataset(torch.utils.data.Dataset):
+ 
+ 
+ class CSFDDataModule(LightningDataModule):
+-    def __init__(self, cfg, df):
++    def __init__(self, cfg, df=None):
+         super().__init__()
+ 
+         self.cfg = cfg
+-        self.df = df
+ 
+-        # self.df = _data_module.get_df(self.cfg.dataset)
++        if df is None:
++            self.df = CSFD.data.get_df(self.cfg.dataset)
++        else:
++            self.df = df
+ 
+         # other configs
+         self.num_workers = (
+@@ -81,8 +83,7 @@ class CSFDDataModule(LightningDataModule):
+             else os.cpu_count()
+         )
+ 
+-        # need to be filled in setup()
+-        self.test_table = []
++        # need to be defined in setup()
+         self.train_dataset = None
+         self.valid_dataset = None
+         self.test_dataset = None
+@@ -96,10 +97,6 @@ class CSFDDataModule(LightningDataModule):
+ 
+     def setup(self, stage=None):
+         if stage == "fit":
+-            # self.train_dataset = CSFDDataset(
+-            #     self.df[self.df["fold"] != self.cfg.dataset.cv.fold],
+-            #     self.cfg.dataset
+-            # )
+             self.train_dataset = CacheDataset(
+                 self.df[self.df["fold"] != self.cfg.dataset.cv.fold].to_dict("records"),
+                 CSFD.monai.transforms.get_transforms(self.cfg, is_train=True),
+@@ -107,10 +104,6 @@ class CSFDDataModule(LightningDataModule):
+             )
+             logging.info(f"training dataset: {len(self.train_dataset)}")
+         if stage in ("fit", "validate"):
+-            # self.valid_dataset = CSFDDataset(
+-            #     self.df[self.df["fold"] == self.cfg.dataset.cv.fold],
+-            #     self.cfg.dataset
+-            # )
+             self.valid_dataset = CacheDataset(
+                 self.df[self.df["fold"] == self.cfg.dataset.cv.fold].to_dict("records"),
+                 CSFD.monai.transforms.get_transforms(self.cfg, is_train=False),
+diff --git a/CSFD/monai/module.py b/CSFD/monai/module.py
+index 3a41652..8a57061 100644
+--- a/CSFD/monai/module.py
++++ b/CSFD/monai/module.py
+@@ -5,9 +5,11 @@ import torch
+ import torch.nn as nn
+ import warnings
+ import transformers.optimization
+-from transformers import AdamW
++# from transformers import AdamW
++from torch.optim import Adam, SGD, AdamW
+ from torchmetrics import F1Score
+ import monai.networks.nets
++import monai.losses
+ from ..metric import torch as _metric_torch_module
+ 
+ 
+@@ -52,12 +54,18 @@ Available net_name: {available_model_names}
+         else:
+             n_model_outputs = self.num_classes
+ 
+-        # assert self.cfg.model.pretrained is False
+-        self.model: torch.nn.Module = model(
+-            **self.cfg.model.kwargs,
+-            spatial_dims=3,
+-            num_classes=n_model_outputs
+-        )
++        if self.cfg.dataset.use_segmentations:
++            self.model: torch.nn.Module = model(
++                **self.cfg.model.kwargs
++            )
++            self.segmentation_loss = monai.losses.DiceLoss(batch=True)
++            self.segmentation_metric = monai.metrics.DiceMetric()
++        else:
++            self.model: torch.nn.Module = model(
++                **self.cfg.model.kwargs,
++                spatial_dims=3,
++                num_classes=n_model_outputs
++            )
+ 
+         self.train_f1_score = F1Score(num_classes=self.num_classes)
+         self.val_f1_score = F1Score(num_classes=self.num_classes)
+@@ -69,7 +77,7 @@ Available net_name: {available_model_names}
+             if self.cfg.train.evaluate_after_steps > 0:
+                 self.trainer.limit_val_batches = 0
+ 
+-            if self.cfg.model.name == "resnet10":
++            if self.cfg.model.name == "resnet10" and self.cfg.model.use_medical_net:
+                 print("[Info] Load model pretrained by MedicalNet")
+                 state_dict = self.model.state_dict()
+                 state_dict.update({
+@@ -97,7 +105,15 @@ Available net_name: {available_model_names}
+ 
+     def training_step(self, batch, batch_idx):
+         logits = self.forward(batch)
+-        loss = _metric_torch_module.competition_loss_with_logits(logits, batch["label"])
++        if self.cfg.dataset.use_segmentations:
++            # with torch.no_grad():
++            #     predicted = torch.where(logits.sigmoid() > 0.5, 1, 0)
++            #     true = torch.where(batch["segmentation"] > 0.5, 1, 0)
++            predicted = logits.sigmoid()
++            true = batch["segmentation"]
++            loss = self.segmentation_loss(predicted, true)
++        else:
++            loss = _metric_torch_module.competition_loss_with_logits(logits, batch["label"])
+ 
+         if torch.isfinite(loss):
+             self.train_loss_meter.update(loss.item(), len(logits))
+@@ -108,10 +124,10 @@ nan/inf detected: loss = {loss}
+ logits = {logits}
+ label = {batch["label"]}
+             """, UserWarning)
+-            self.log("train/loss", loss.item(), prog_bar=False)
++            # self.log("train/loss", loss.item(), prog_bar=False)
+         return loss
+ 
+-    def training_step_end(self, _):
++    def training_step_end(self, *args, **kwargs):
+         if (
+             self.global_step >= self.cfg.train.evaluate_after_steps
+             and self.trainer.limit_val_batches == 0.0
+@@ -120,17 +136,29 @@ label = {batch["label"]}
+ 
+     def validation_step(self, batch, batch_idx):
+         logits = self.forward(batch)
+-        loss = _metric_torch_module.competition_loss_with_logits(logits, batch["label"])
+-        if not torch.isfinite(loss):
++        if self.cfg.dataset.use_segmentations:
++            true = torch.where(batch["segmentation"] > 0.5, 1, 0)
++            loss = self.segmentation_loss(logits.sigmoid(), true)
++            predicted = torch.where(logits.sigmoid() > 0.5, 1, 0)
++            metric = self.segmentation_metric(predicted, true).mean(axis=0).mean(axis=0)
++            self.log("valid/metric", metric, prog_bar=False)
++        else:
++            loss = _metric_torch_module.competition_loss_with_logits(logits, batch["label"])
++
++        if torch.isfinite(loss):
++            self.log("valid/loss", loss, prog_bar=False)
++        else:
+             warnings.warn(f"""
+ nan/inf detected: loss = {loss}
+ logits = {logits}
+ label = {batch["label"]}
+             """)
+-        return loss
+ 
+-    def validation_step_end(self, loss):
+-        self.log("valid/loss", float(torch.nanmean(loss)), prog_bar=False)
++    # def validation_step_end(self, results: list):
++    #     print(results)
++    #     self.log("valid/loss", float(np.nanmean([result["loss"] for result in results])), prog_bar=False)
++    #     if "metric" in results[0].keys:
++    #         self.log("valid/metric", float(np.nanmean([result["metric"] for result in results])), prog_bar=False)
+ 
+     def configure_optimizers(self):
+         if self.cfg.model.optimizer.name == "AdamW":
+diff --git a/CSFD/monai/training.py b/CSFD/monai/training.py
+index e1e86a1..4f88bfb 100644
+--- a/CSFD/monai/training.py
++++ b/CSFD/monai/training.py
+@@ -27,12 +27,21 @@ def train(cfg):
+     module = CSFD.monai.CSFDModule(cfg)
+     datamodule = CSFD.monai.CSFDDataModule(cfg, df)
+ 
+-    name = f"{cfg.train.name_prefix}{cfg.model.name}_fold{cfg.dataset.cv.fold}-of-{cfg.dataset.cv.n_folds}_{cfg.train.name_suffix}"
++    name = "_".join(
++        [
++            f"{cfg.train.name_prefix}{cfg.model.name}",
++            f"fold{cfg.dataset.cv.fold}-of-{cfg.dataset.cv.n_folds}",
++            *(
++                [cfg.train.name_suffix] if cfg.train.name_suffix else []
++            )
++        ]
++    )
+ 
+     callbacks = [
+         ModelCheckpoint(
+             dirpath=pathlib.Path(cfg.train.model_path) / "checkpoints",
+             filename=name,
++            verbose=True,
+             monitor="valid/loss",
+             mode="min",
+             save_weights_only=True,
+diff --git a/CSFD/monai/transforms.py b/CSFD/monai/transforms.py
+index a1ad2dc..1b135f5 100644
+--- a/CSFD/monai/transforms.py
++++ b/CSFD/monai/transforms.py
+@@ -1,7 +1,5 @@
+ import monai.transforms
+-import pandas as pd
+ import numpy as np
+-import warnings
+ import CSFD.data.three_dimensions
+ import CSFD.data.io_with_cfg
+ from monai.transforms import (
+@@ -38,20 +36,21 @@ def get_transforms(cfg, is_train):
+         if hasattr(cfg.train.augmentation, "affine"):
+             transforms.append(
+                 RandAffined(
+-                    keys="data",
++                    keys=["data", "segmentation"],
+                     rotate_range=np.deg2rad(cfg.train.augmentation.affine.rotate_range_in_deg),
+                     translate_range=np.multiply(
+                         [cfg.dataset.depth, *cfg.dataset.image_2d_shape],
+                         cfg.train.augmentation.affine.translate_range_in_scale
+                     ),
+-                    **cfg.train.augmentation.affine.kwargs
++                    **cfg.train.augmentation.affine.kwargs,
++                    allow_missing_keys=True
+                 )
+             )
+ 
+     transforms += [
+         # Lambdad(keys="data", func=normalize_image_wise),
+-        EnsureTyped(keys=("data", "label"), dtype=torch.float16, allow_missing_keys=True),
+-        ToTensord(keys=("data", "label"))
++        EnsureTyped(keys=("data", "label", "segmentation"), dtype=torch.float16, allow_missing_keys=True),
++        ToTensord(keys=("data", "label", "segmentation"), allow_missing_keys=True)
+     ]
+     transforms = Compose(transforms)
+     transforms.set_random_state(seed=cfg.train.seed)
+@@ -67,7 +66,7 @@ def normalize_image_wise(data):
+ 
+ class LoadImage(monai.transforms.MapTransform):
+     def __init__(self, cfg_dataset):
+-        keys = ["StudyInstanceUID", "np_images_path", "dcm_images_path"]
++        keys = ["StudyInstanceUID", "np_images_path", "dcm_images_path", "nil_segmentations_path"]
+         super().__init__(keys, allow_missing_keys=True)
+         self.cfg_dataset = cfg_dataset
+ 
+@@ -93,13 +92,33 @@ class LoadImage(monai.transforms.MapTransform):
+         images = CSFD.data.io_with_cfg.load_3d_images(images_path, self.cfg_dataset)
+ 
+         if target_columns is None:
+-            return {
++            ret = {
+                 "uid": uid,
+                 "data": images
+             }
+         else:
+-            return {
++            ret = {
+                 "uid": uid,
+                 "data": images,
+                 "label": target_columns
+             }
++
++        if self.cfg_dataset.use_segmentations:
++            segmentations = CSFD.data.io.load_segmentations(
++                row["nil_segmentations_path"], separate_in_channels=True
++            )
++            *left_shapes, seg_height, seg_width = segmentations.shape
++            segmentations = segmentations.reshape((-1, seg_height, seg_width))
++            segmentations = np.stack([
++                CSFD.data.io.resize_hw(seg, self.cfg_dataset.image_2d_shape)
++                for seg in segmentations
++            ], axis=0)
++            segmentations = segmentations.reshape((*left_shapes, *self.cfg_dataset.image_2d_shape))
++
++            segmentations = CSFD.data.three_dimensions.resize_depth(
++                segmentations,
++                self.cfg_dataset.depth, self.cfg_dataset.depth_range, self.cfg_dataset.enable_depth_resized_with_cv2
++            )
++            ret["segmentation"] = segmentations / 255
++
++        return ret
+diff --git a/dist/wheels/dataset-metadata.json b/dist/wheels/dataset-metadata.json
+new file mode 100644
+index 0000000..226402c
+--- /dev/null
++++ b/dist/wheels/dataset-metadata.json
+@@ -0,0 +1,7 @@
++{
++  "title": "CSFD Python Wheel",
++  "id": "ranchantan/csfd-required-libs-python-wheels",
++  "licenses": [
++    {"name": "CC0-1.0"}
++  ]
++}
+\ No newline at end of file
+diff --git a/meta/monitor_submission_executing_time.py b/meta/monitor_submission_executing_time.py
+index 1ca87e3..e44d09d 100644
+--- a/meta/monitor_submission_executing_time.py
++++ b/meta/monitor_submission_executing_time.py
+@@ -4,6 +4,7 @@ import datetime as dt
+ import sys
+ 
+ 
++# competition_name = None
+ competition_name = "rsna-2022-cervical-spine-fracture-detection"
+ # username_to_be_monitored = "Ranchantan"
+ # username_to_be_monitored = None
+diff --git a/monai/wandb/debug-internal.log b/monai/wandb/debug-internal.log
+index 67be4ab..9774b9a 120000
+--- a/monai/wandb/debug-internal.log
++++ b/monai/wandb/debug-internal.log
+@@ -1 +1 @@
+-run-20220914_131110-2oqna1c6/logs/debug-internal.log
+\ No newline at end of file
++run-20220914_133640-70wfivli/logs/debug-internal.log
+\ No newline at end of file
+diff --git a/monai/wandb/debug.log b/monai/wandb/debug.log
+index effedd7..3bc7fdd 120000
+--- a/monai/wandb/debug.log
++++ b/monai/wandb/debug.log
+@@ -1 +1 @@
+-run-20220914_131110-2oqna1c6/logs/debug.log
+\ No newline at end of file
++run-20220914_133640-70wfivli/logs/debug.log
+\ No newline at end of file
+diff --git a/monai/wandb/latest-run b/monai/wandb/latest-run
+index 2c730bd..6e0e96e 120000
+--- a/monai/wandb/latest-run
++++ b/monai/wandb/latest-run
+@@ -1 +1 @@
+-run-20220914_131110-2oqna1c6
+\ No newline at end of file
++run-20220914_133640-70wfivli
+\ No newline at end of file
+diff --git a/monai_with_semantic_segmentation/SEResNext50.yaml b/monai_with_semantic_segmentation/SEResNext50.yaml
+new file mode 100644
+index 0000000..0aba75e
+--- /dev/null
++++ b/monai_with_semantic_segmentation/SEResNext50.yaml
+@@ -0,0 +1,125 @@
++dataset:
++  type: train
++  data_root_path: ../data/rsna-2022-cervical-spine-fracture-detection/
++  train_3d_images: ../data/3d_train_images_v3/
++  train_segmentations_path: ../semantic_segmentation/predicted_data/uint8/fold0/
++
++  use_segmentations: false
++
++#  data_type: u1
++  data_type: f4
++
++  enable_depth_resized_with_cv2: true
++
++  # Scales to crop images
++  depth_range: [0.1, 0.9]
++#  depth_range: null
++  height_range: null
++  width_range: null
++#  height_range: [0.2, 0.8]
++#  width_range: [0.2, 0.8]
++#  height_range: [0.1, 0.8]
++#  width_range: [0.15, 0.85]
++
++  image_2d_shape: [256, 256]
++#  image_2d_shape: [300, 300]
++#  depth: 256
++  depth: 128
++#  depth: 200
++#  depth: 80
++
++  save_images_with_specific_depth: false
++  save_images_with_specific_height: false
++  save_images_with_specific_width: false
++
++  type_to_load: npz
++#  type_to_load: dcm
++
++  use_normalized_batches: true
++  equalize_adapthist: false  # temp, if true, it takes quite long time
++
++  target_columns: [patient_overall, C1, C2, C3, C4, C5, C6, C7]
++  cv:
++    type: StratifiedKFold
++    seed: 42
++    n_folds: 4
++    fold: null  # null -> run all folds for monai/run.py
++
++  num_workers: null  # null -> os.cpu_count()
++  train_batch_size: 8
++  valid_batch_size: 8
++  test_batch_size: 2
++
++  train_cache_rate: 0
++  valid_cache_rate: 0
++
++
++model:
++  seed: 42
++  name: SEResNext50
++  kwargs:
++    in_channels: 1
++
++  use_multi_sample_dropout: false
++
++  optimizer:
++    name: AdamW
++    scheduler:
++#      name: null
++#      name: cosine
++#      kwargs:
++#        num_warmup_steps: 100
++#        num_training_steps: 500
++#      name: MultiStep
++#      kwargs:
++#        milestones: [300]f
++#        gamma: 1e-3
++      name: CosineAnnealingWarmRestarts
++      kwargs:
++        T_0: 700
++        T_mult: 1
++        eta_min: 1e-9
++
++
++train:
++  accelerator: gpu
++  devices: 1
++
++  precision: 16
++
++  seed: 42
++
++  max_epochs: 80
++
++  learning_rate: 8e-5
++  weight_decay: 0
++  name_prefix: ""
++
++  name_suffix: v5.4.3
++
++  model_path: models
++
++  early_stopping: false
++
++  validation_interval: 0.2
++  evaluate_after_steps: 0
++
++  logging_interval: 10
++
++  augmentation:
++    scale_intensity:
++      kwargs:
++        factors: [-0.2, 0.2]
++        prob: 0.5
++    shift_intensity:
++      kwargs:
++        offsets: [-0.1, 0.1]
++        prob: 0.5
++    affine:
++      rotate_range_in_deg: [15, 0, 0]
++      translate_range_in_scale: [0, 0.0625, 0.0625]
++      kwargs:
++        prob: 0.5
++        scale_range: [0, 0.1, 0.1]
++        mode: nearest
++        padding_mode: reflection
+diff --git a/monai_with_semantic_segmentation/train.py b/monai_with_semantic_segmentation/train.py
+new file mode 100644
+index 0000000..8ce85c4
+--- /dev/null
++++ b/monai_with_semantic_segmentation/train.py
+@@ -0,0 +1,9 @@
++import CSFD.data.three_dimensions
++import CSFD.bounding_box
++
++
++if __name__ == "__main__":
++    cfg = CSFD.data.load_yaml_config("SEResNext50.yaml")
++    df = CSFD.data.three_dimensions.get_df(cfg.dataset)
++
++    CSFD.bounding_box.get_3d_bounding_box()
+\ No newline at end of file
+diff --git a/monai_with_semantic_segmentation/visualize.py b/monai_with_semantic_segmentation/visualize.py
+new file mode 100644
+index 0000000..4516a0d
+--- /dev/null
++++ b/monai_with_semantic_segmentation/visualize.py
+@@ -0,0 +1,97 @@
++import CSFD.data.three_dimensions
++import CSFD.bounding_box
++import numpy as np
++import itertools
++import tqdm
++import plotly.express as px
++import plotly_utility
++import pandas as pd
++import pathlib
++
++cfg = CSFD.data.load_yaml_config("SEResNext50.yaml")
++df = CSFD.data.three_dimensions.get_df(cfg.dataset)
++
++train_segmentations_path = pathlib.Path(cfg.dataset.train_segmentations_path)
++
++for name in (p.name for p in train_segmentations_path.parent.glob("fold*") if p.is_dir()):
++    train_segmentations_path = train_segmentations_path.with_name(name)
++    target_csv_path = train_segmentations_path.with_name(f"segmentations-info-{train_segmentations_path.name}.csv")
++
++    if not target_csv_path.exists():
++        data = []
++        for p in tqdm.tqdm(df["npz_segmentations_path"]):
++            for i, segmentations in enumerate(np.load(p)["arr_0"]):
++                count = np.count_nonzero(segmentations)
++
++                row = {"name": p.name, "type": f"C{i + 1}", "count": count}
++                if count > 0:
++                    bb = CSFD.bounding_box.get_3d_bounding_box(segmentations)
++                    row["shape0"], row["shape1"], row["shape2"] = segmentations[tuple(itertools.starmap(slice, bb))].shape
++                    row["mean0"], row["mean1"], row["mean2"] = np.mean(bb, axis=1)
++                else:
++                    print(f"count == 0")
++                data.append(row)
++
++        segmentation_df = pd.DataFrame(data)
++        segmentation_df.to_csv(target_csv_path, index=False)
++    else:
++        segmentation_df = pd.read_csv(target_csv_path)
++
++
++import plotly_utility.express as pux
++
++fig = pux.histogram(
++    segmentation_df,
++    x="count", facet_row="type", log_y=True, nbins=100,
++    width=800, height=1000
++)
++plotly_utility.offline.mpl_plot(fig)
++
++
++fig = pux.histogram(
++    segmentation_df.melt(
++        id_vars="type",
++        value_vars=["shape0", "shape1", "shape2"],
++        var_name="shape", value_name="x"
++    ),
++    title="Shape",
++    x="x", facet_col="shape", facet_row="type",
++    use_different_bin_widths=True, nbins=20,
++    width=800, height=1000
++)
++fig.update_xaxes(title="depth", matches="x1", col=1)
++fig.update_xaxes(title="height", matches="x2", col=2)
++fig.update_xaxes(title="width", matches="x3", col=3)
++plotly_utility.subplots.update_xaxes(fig, "inside", title=None)
++plotly_utility.offline.mpl_plot(fig)
++
++
++fig = pux.histogram(
++    segmentation_df.melt(
++        id_vars="type",
++        value_vars=["mean0", "mean1", "mean2"],
++        var_name="mean", value_name="x"
++    ),
++    title="Mean Positions",
++    x="x", facet_col="mean", facet_row="type",
++    use_different_bin_widths=True, nbins=20,
++    width=800, height=1000
++)
++fig.update_xaxes(title="depth", matches="x1", col=1)
++fig.update_xaxes(title="height", matches="x2", col=2)
++fig.update_xaxes(title="width", matches="x3", col=3)
++plotly_utility.subplots.update_xaxes(fig, "inside", title=None)
++plotly_utility.offline.mpl_plot(fig)
++
++
++fig = pux.histogram(
++    segmentation_df[segmentation_df["count"] < 1000],
++    title="count < 1000",
++    x="count", facet_row="type", log_y=True, nbins=100,
++    width=800, height=1000
++)
++plotly_utility.offline.mpl_plot(fig)
++plotly_utility.offline.mpl_plot(
++    px.histogram(segmentation_df[segmentation_df["count"] < 1000].sort_values("type"), x="type")
++)
++
+diff --git a/semantic_segmentation/UNet.yaml b/semantic_segmentation/UNet.yaml
+index aeb59f1..3258851 100644
+--- a/semantic_segmentation/UNet.yaml
++++ b/semantic_segmentation/UNet.yaml
+@@ -8,35 +8,39 @@ dataset:
+   enable_depth_resized_with_cv2: true
+ 
+   # Scales to crop images
+-  depth_range: null
++  depth_range: [0.1, 0.9]
+   height_range: null
+   width_range: null
+-
+-  image_2d_shape: null
+-  depth: null
++#  image_2d_shape: null
++#  depth: null
++  image_2d_shape: [256, 256]
++  depth: 128
+ 
+   save_images_with_specific_depth: false
+   save_images_with_specific_height: false
+   save_images_with_specific_width: false
+ 
+-#  type_to_load: npz
+-  type_to_load: dcm
++  type_to_load: npz
++#  type_to_load: dcm
+ 
+   use_normalized_batches: true
++  equalize_adapthist: false
+ 
+   target_columns: [patient_overall, C1, C2, C3, C4, C5, C6, C7]
+   cv:
+     type: StratifiedKFold
+     seed: 42
+     n_folds: 4
+-    fold: null  # null -> run all folds for monai/run.py
++    fold: 3  # null -> run all folds for monai/run.py
+ 
+   num_workers: null  # null -> os.cpu_count()
+   train_batch_size: 2
+-  valid_batch_size: 2
++  valid_batch_size: 4
+   test_batch_size: 2
+ 
+-  train_cache_rate: 0
++#  train_cache_rate: 0
++#  valid_cache_rate: 0
++  train_cache_rate: 1
+   valid_cache_rate: 1
+ 
+   use_segmentations: true
+@@ -46,7 +50,18 @@ model:
+   seed: 42
+   name: Unet
+   kwargs:
+-     n_input_channels: 1
++    spatial_dims: 3
++    in_channels: 1
++    out_channels: 7
++    channels: [32, 64, 128, 256, 512]
++    strides: [2, 2, 2, 2]
++#    kernel_size: 3
++#    up_kernel_size: 3
++    num_res_units: 2
++#    act: PRELU
++    norm: BATCH
++    dropout: 0.2
++#    bias: True
+ 
+   use_multi_sample_dropout: false
+ 
+@@ -77,23 +92,23 @@ train:
+ 
+   seed: 42
+ 
+-  max_epochs: 20
++  max_epochs: 400
+ 
+-  learning_rate: 1e-5
++  learning_rate: 1e-4
+   weight_decay: 0
+   name_prefix: ""
+ 
+ #  name_suffix: v5.3.1
+   name_suffix: v5.4
+ 
+-  model_path: models
++  model_path: models2
+ 
+   early_stopping: false
+ 
+-  validation_interval: 0.2
++  validation_interval: 0.99
+   evaluate_after_steps: 0
+ 
+-  logging_interval: 10
++  logging_interval: 1
+ 
+   augmentation:
+     scale_intensity:
+@@ -104,11 +119,11 @@ train:
+       kwargs:
+         offsets: [-0.1, 0.1]
+         prob: 0.5
+-    affine:
+-      rotate_range_in_deg: 15
+-      translate_range_in_scale: 0.0625
+-      kwargs:
+-        prob: 0.5
+-        scale_range: [0.1, 0.1]
+-        mode: nearest
+-        padding_mode: reflection
++#    affine:
++#      rotate_range_in_deg: 15
++#      translate_range_in_scale: 0.0625
++#      kwargs:
++#        prob: 0.5
++#        scale_range: [0.1, 0.1]
++#        mode: nearest
++#        padding_mode: reflection
+diff --git a/semantic_segmentation/convert_predicted_float16_to_bool.py b/semantic_segmentation/convert_predicted_float16_to_bool.py
+new file mode 100644
+index 0000000..288f80f
+--- /dev/null
++++ b/semantic_segmentation/convert_predicted_float16_to_bool.py
+@@ -0,0 +1,20 @@
++import pathlib
++import numpy as np
++import tqdm
++
++predicted_data_dir_path = pathlib.Path("predicted_data")
++
++src_dir_path = predicted_data_dir_path / "float16"
++dst_dir_path = predicted_data_dir_path / "uint8"
++dst_dir_path.mkdir(exist_ok=True)
++
++for fold_dir in src_dir_path.glob("*"):
++    print(f"* {fold_dir}")
++    for src_path in tqdm.tqdm(list(fold_dir.glob("*.npz"))):
++        dst_path = dst_dir_path / src_path.relative_to(src_dir_path)
++        if dst_path.exists():
++            continue
++        segmentations = np.load(src_path)["arr_0"]
++        dst_path.parent.mkdir(exist_ok=True)
++        np.savez_compressed(dst_path, segmentations.astype(np.uint8))
++
+diff --git a/semantic_segmentation/predict.py b/semantic_segmentation/predict.py
+new file mode 100644
+index 0000000..0684025
+--- /dev/null
++++ b/semantic_segmentation/predict.py
+@@ -0,0 +1,67 @@
++import pathlib
++import pandas as pd
++import CSFD.monai.from_checkpoint
++import CSFD.data.three_dimensions
++import numpy as np
++import sys
++import tqdm
++
++
++if __name__ == "__main__":
++    if len(sys.argv) == 1:
++        model_path = "models2"
++    else:
++        model_path = sys.argv[1]
++
++    cfg, ckpt_dict = CSFD.monai.from_checkpoint.load_cfg_and_checkpoints(model_path)
++    # cfg.dataset.type_to_load = "dcm"
++    cfg.dataset.type_to_load = "npz"
++    # cfg.dataset.type = "test"
++    cfg.dataset.type = "train"
++    cfg.dataset.use_segmentations = False
++    # cfg.dataset.test_batch_size = 4
++
++    df = CSFD.data.three_dimensions.get_df(cfg.dataset, ignore_invalids=False)
++    assert len(df) == 2019
++
++    output_path = pathlib.Path("predicted_data") / "float16"
++    output_path.mkdir(exist_ok=True, parents=True)
++
++    cfg.dataset.use_segmentations = True
++
++    # import pytorch_lightning
++    # pytorch_lightning.seed_everything(cfg.model.seed)
++    for fold, ckpt_path in ckpt_dict.items():
++        print(f"* fold {fold}")
++
++        target_dir = output_path / f"fold{fold}"
++        if target_dir.exists():
++            print(f"[Info] Skipped {target_dir}")
++            continue
++
++        target_dir.mkdir(exist_ok=True)
++
++        # if target_csv.exists():
++        #     continue
++        cfg.dataset.cv.fold = fold
++
++        from pytorch_lightning import Trainer
++        import torch
++        tl = Trainer(
++            accelerator="gpu", devices=1,
++            max_epochs=1000,
++            precision=cfg.train.precision
++        )
++        module = CSFD.monai.CSFDModule.load_from_checkpoint(str(ckpt_path), cfg=cfg, map_location=torch.device("cuda"))
++
++        for i in tqdm.trange(int(np.ceil(len(df) / 10))):
++            target_df = df.iloc[10 * i: 10 * (i + 1)]
++            datamodule = CSFD.monai.CSFDDataModule(cfg, target_df)
++            predicted = tl.predict(module, datamodule)
++            with torch.no_grad():
++                predicted = torch.concat(predicted).float().sigmoid().numpy()
++            predicted = predicted.astype(np.float16)
++
++            assert len(predicted) == len(target_df)
++            for data, uid in zip(predicted, target_df["StudyInstanceUID"]):
++                np.savez_compressed(target_dir / f"{uid}.npz", data)
+diff --git a/semantic_segmentation/train.py b/semantic_segmentation/train.py
+index ca56af8..0295a5b 100644
+--- a/semantic_segmentation/train.py
++++ b/semantic_segmentation/train.py
+@@ -2,27 +2,35 @@ import CSFD.data.three_dimensions
+ import CSFD.data.io_with_cfg
+ 
+ 
+-cfg = CSFD.data.load_yaml_config("../monai/resnet10.yaml")
+-cfg.dataset.type_to_load = "npz"
+-cfg.dataset.image_2d_shape = None
+-cfg.dataset.depth = None
+-cfg.dataset.depth_range = None
+-cfg.dataset.height_range = None
+-cfg.dataset.width_range = None
+-cfg.dataset.save_images_with_specific_depth = False
+-cfg.dataset.save_images_with_specific_height = False
+-cfg.dataset.save_images_with_specific_width = False
+-cfg.dataset.use_segmentations = True
+-cfg.train.augmentation = {}
++cfg = CSFD.data.load_yaml_config("UNet.yaml")
++# cfg.dataset.type_to_load = "npz"
++# cfg.dataset.image_2d_shape = None
++# cfg.dataset.depth = None
++# cfg.dataset.depth_range = None
++# cfg.dataset.height_range = None
++# cfg.dataset.width_range = None
++# cfg.dataset.save_images_with_specific_depth = False
++# cfg.dataset.save_images_with_specific_height = False
++# cfg.dataset.save_images_with_specific_width = False
++# cfg.dataset.use_segmentations = True
++# cfg.train.augmentation = {}
+ 
+ 
+ df = CSFD.data.three_dimensions.get_df(cfg.dataset)
+-df = df.dropna()
++# df = df.dropna()
+ 
++# import CSFD.monai
++# module = CSFD.monai.CSFDModule(cfg)
++# datamodule = CSFD.monai.CSFDDataModule(cfg, df)
++# datamodule.setup("fit")
++# # print(datamodule.train_dataset[0])
++# batch = datamodule.train_dataset[0]
++# images = batch["segmentation"].numpy()
+ 
+-for nil_path, dcm_path in zip(df["nil_images_path"], df["dcm_images_path"]):
+-    break
++print(cfg)
+ 
++import CSFD.monai.training
++CSFD.monai.training.train(cfg)
+ 
+ 
+ # https://pytorch.org/hub/ultralytics_yolov5/
+diff --git a/setup.cfg b/setup.cfg
+index c9edb62..8f7e79e 100644
+--- a/setup.cfg
++++ b/setup.cfg
+@@ -20,5 +20,6 @@ install_requires =
+     python-gdcm
+     pylibjpeg
+     pylibjpeg-libjpeg
++    nibabel
+ 
+     wandb
+\ No newline at end of file
+diff --git a/upload_csfd_module.sh b/upload_csfd_module.sh
+index 46fdd5d..1c2801a 100644
+--- a/upload_csfd_module.sh
++++ b/upload_csfd_module.sh
+@@ -1,7 +1,6 @@
+ #!/bin/sh
+ 
+-#rm -rf build csfd.egg-info/ dist/
+-
+ python3.7 setup.py bdist_wheel
+ python3.7 -m pip download --only-binary :all: . -d dist/wheels
+-kaggle datasets version --dir-mode zip -p dist/ -m ""
++kaggle datasets version --dir-mode skip -p dist/ -m ""
++kaggle datasets version -p dist/wheels -m ""
+diff --git a/visualize/a.ipynb b/visualize/a.ipynb
+deleted file mode 100644
+index 8143c67..0000000
+--- a/visualize/a.ipynb
++++ /dev/null
+@@ -1,207 +0,0 @@
+-{
+- "cells": [
+-  {
+-   "cell_type": "code",
+-   "execution_count": 1,
+-   "outputs": [],
+-   "source": [
+-    "import os\n",
+-    "import pandas as pd\n",
+-    "\n",
+-    "os.chdir(\"./rsna-2022-cervical-spine-fracture-detection/visualize\")"
+-   ],
+-   "metadata": {
+-    "collapsed": false,
+-    "pycharm": {
+-     "name": "#%%\n"
+-    }
+-   }
+-  },
+-  {
+-   "cell_type": "code",
+-   "execution_count": 2,
+-   "outputs": [],
+-   "source": [
+-    "import CSFD.data.three_dimensions\n",
+-    "import CSFD.monai.from_checkpoint\n",
+-    "import pathlib"
+-   ],
+-   "metadata": {
+-    "collapsed": false,
+-    "pycharm": {
+-     "name": "#%%\n"
+-    }
+-   }
+-  },
+-  {
+-   "cell_type": "code",
+-   "execution_count": 3,
+-   "outputs": [
+-    {
+-     "data": {
+-      "text/plain": "{'dataset': {'type': 'train', 'data_root_path': '../data/rsna-2022-cervical-spine-fracture-detection', 'train_3d_images': '../data/3d_train_images_v2', 'data_type': 'f4', 'enable_depth_resized_with_cv2': True, 'depth_range': [0.1, 0.9], 'height_range': None, 'width_range': None, 'image_2d_shape': [256, 256], 'depth': 128, 'save_images_with_specific_depth': False, 'use_normalized_batches': True, 'type_to_load': 'npz', 'target_columns': ['patient_overall', 'C1', 'C2', 'C3', 'C4', 'C5', 'C6', 'C7'], 'cv': {'type': 'KFold', 'seed': 42, 'n_folds': 4, 'fold': None}, 'num_workers': None, 'train_batch_size': 4, 'valid_batch_size': 4, 'test_batch_size': 2}, 'model': {'seed': 42, 'name': 'EfficientNetBN', 'kwargs': {'model_name': 'efficientnet-b4', 'in_channels': 1, 'pretrained': True}, 'use_multi_sample_dropout': False, 'optimizer': {'name': 'AdamW', 'scheduler': {'name': None, 'kwargs': {}}}}, 'train': {'accelerator': 'gpu', 'devices': 1, 'precision': 16, 'seed': 42, 'max_epochs': 5, 'learning_rate': 1e-05, 'weight_decay': 0, 'name_prefix': '', 'name_suffix': 'test-v4.3', 'model_path': 'models', 'early_stopping': False, 'validation_interval': 0.2, 'evaluate_after_steps': 0, 'logging_interval': 10}}"
+-     },
+-     "execution_count": 3,
+-     "metadata": {},
+-     "output_type": "execute_result"
+-    }
+-   ],
+-   "source": [
+-    "model_path = pathlib.Path(\"../monai/models/EfficientNetBN_folds4_test-v4.3\")\n",
+-    "cfg, ckpt_paths = CSFD.monai.from_checkpoint.load_cfg_and_checkpoints(model_path)\n",
+-    "cfg"
+-   ],
+-   "metadata": {
+-    "collapsed": false,
+-    "pycharm": {
+-     "name": "#%%\n"
+-    }
+-   }
+-  },
+-  {
+-   "cell_type": "code",
+-   "execution_count": 4,
+-   "outputs": [
+-    {
+-     "name": "stdout",
+-     "output_type": "stream",
+-     "text": [
+-      "creating 3d images: 100%|███████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 2018/2018 [00:00<00:00, 8462.97it/s]\n"
+-     ]
+-    },
+-    {
+-     "data": {
+-      "text/plain": "               StudyInstanceUID  patient_overall  C1  C2  C3  C4  C5  C6  C7  \\\n0      1.2.826.0.1.3680043.6200                1   1   1   0   0   0   0   0   \n1     1.2.826.0.1.3680043.27262                1   0   1   0   0   0   0   0   \n2     1.2.826.0.1.3680043.21561                1   0   1   0   0   0   0   0   \n3     1.2.826.0.1.3680043.12351                0   0   0   0   0   0   0   0   \n4      1.2.826.0.1.3680043.1363                1   0   0   0   0   1   0   0   \n...                         ...              ...  ..  ..  ..  ..  ..  ..  ..   \n2014  1.2.826.0.1.3680043.21684                1   0   1   0   0   0   1   1   \n2015   1.2.826.0.1.3680043.4786                1   0   0   0   0   0   0   1   \n2016  1.2.826.0.1.3680043.14341                0   0   0   0   0   0   0   0   \n2017  1.2.826.0.1.3680043.12053                0   0   0   0   0   0   0   0   \n2018  1.2.826.0.1.3680043.18786                1   0   0   0   0   0   0   1   \n\n      fold                                     np_images_path  \n0        1  ../data/3d_train_images_v2/256_256/normal/norm...  \n1        1  ../data/3d_train_images_v2/256_256/normal/norm...  \n2        1  ../data/3d_train_images_v2/256_256/normal/norm...  \n3        3  ../data/3d_train_images_v2/256_256/normal/norm...  \n4        3  ../data/3d_train_images_v2/256_256/normal/norm...  \n...    ...                                                ...  \n2014     3  ../data/3d_train_images_v2/256_256/normal/norm...  \n2015     1  ../data/3d_train_images_v2/256_256/normal/norm...  \n2016     0  ../data/3d_train_images_v2/256_256/normal/norm...  \n2017     3  ../data/3d_train_images_v2/256_256/normal/norm...  \n2018     0  ../data/3d_train_images_v2/256_256/normal/norm...  \n\n[2018 rows x 11 columns]",
+-      "text/html": "<div>\n<style scoped>\n    .dataframe tbody tr th:only-of-type {\n        vertical-align: middle;\n    }\n\n    .dataframe tbody tr th {\n        vertical-align: top;\n    }\n\n    .dataframe thead th {\n        text-align: right;\n    }\n</style>\n<table border=\"1\" class=\"dataframe\">\n  <thead>\n    <tr style=\"text-align: right;\">\n      <th></th>\n      <th>StudyInstanceUID</th>\n      <th>patient_overall</th>\n      <th>C1</th>\n      <th>C2</th>\n      <th>C3</th>\n      <th>C4</th>\n      <th>C5</th>\n      <th>C6</th>\n      <th>C7</th>\n      <th>fold</th>\n      <th>np_images_path</th>\n    </tr>\n  </thead>\n  <tbody>\n    <tr>\n      <th>0</th>\n      <td>1.2.826.0.1.3680043.6200</td>\n      <td>1</td>\n      <td>1</td>\n      <td>1</td>\n      <td>0</td>\n      <td>0</td>\n      <td>0</td>\n      <td>0</td>\n      <td>0</td>\n      <td>1</td>\n      <td>../data/3d_train_images_v2/256_256/normal/norm...</td>\n    </tr>\n    <tr>\n      <th>1</th>\n      <td>1.2.826.0.1.3680043.27262</td>\n      <td>1</td>\n      <td>0</td>\n      <td>1</td>\n      <td>0</td>\n      <td>0</td>\n      <td>0</td>\n      <td>0</td>\n      <td>0</td>\n      <td>1</td>\n      <td>../data/3d_train_images_v2/256_256/normal/norm...</td>\n    </tr>\n    <tr>\n      <th>2</th>\n      <td>1.2.826.0.1.3680043.21561</td>\n      <td>1</td>\n      <td>0</td>\n      <td>1</td>\n      <td>0</td>\n      <td>0</td>\n      <td>0</td>\n      <td>0</td>\n      <td>0</td>\n      <td>1</td>\n      <td>../data/3d_train_images_v2/256_256/normal/norm...</td>\n    </tr>\n    <tr>\n      <th>3</th>\n      <td>1.2.826.0.1.3680043.12351</td>\n      <td>0</td>\n      <td>0</td>\n      <td>0</td>\n      <td>0</td>\n      <td>0</td>\n      <td>0</td>\n      <td>0</td>\n      <td>0</td>\n      <td>3</td>\n      <td>../data/3d_train_images_v2/256_256/normal/norm...</td>\n    </tr>\n    <tr>\n      <th>4</th>\n      <td>1.2.826.0.1.3680043.1363</td>\n      <td>1</td>\n      <td>0</td>\n      <td>0</td>\n      <td>0</td>\n      <td>0</td>\n      <td>1</td>\n      <td>0</td>\n      <td>0</td>\n      <td>3</td>\n      <td>../data/3d_train_images_v2/256_256/normal/norm...</td>\n    </tr>\n    <tr>\n      <th>...</th>\n      <td>...</td>\n      <td>...</td>\n      <td>...</td>\n      <td>...</td>\n      <td>...</td>\n      <td>...</td>\n      <td>...</td>\n      <td>...</td>\n      <td>...</td>\n      <td>...</td>\n      <td>...</td>\n    </tr>\n    <tr>\n      <th>2014</th>\n      <td>1.2.826.0.1.3680043.21684</td>\n      <td>1</td>\n      <td>0</td>\n      <td>1</td>\n      <td>0</td>\n      <td>0</td>\n      <td>0</td>\n      <td>1</td>\n      <td>1</td>\n      <td>3</td>\n      <td>../data/3d_train_images_v2/256_256/normal/norm...</td>\n    </tr>\n    <tr>\n      <th>2015</th>\n      <td>1.2.826.0.1.3680043.4786</td>\n      <td>1</td>\n      <td>0</td>\n      <td>0</td>\n      <td>0</td>\n      <td>0</td>\n      <td>0</td>\n      <td>0</td>\n      <td>1</td>\n      <td>1</td>\n      <td>../data/3d_train_images_v2/256_256/normal/norm...</td>\n    </tr>\n    <tr>\n      <th>2016</th>\n      <td>1.2.826.0.1.3680043.14341</td>\n      <td>0</td>\n      <td>0</td>\n      <td>0</td>\n      <td>0</td>\n      <td>0</td>\n      <td>0</td>\n      <td>0</td>\n      <td>0</td>\n      <td>0</td>\n      <td>../data/3d_train_images_v2/256_256/normal/norm...</td>\n    </tr>\n    <tr>\n      <th>2017</th>\n      <td>1.2.826.0.1.3680043.12053</td>\n      <td>0</td>\n      <td>0</td>\n      <td>0</td>\n      <td>0</td>\n      <td>0</td>\n      <td>0</td>\n      <td>0</td>\n      <td>0</td>\n      <td>3</td>\n      <td>../data/3d_train_images_v2/256_256/normal/norm...</td>\n    </tr>\n    <tr>\n      <th>2018</th>\n      <td>1.2.826.0.1.3680043.18786</td>\n      <td>1</td>\n      <td>0</td>\n      <td>0</td>\n      <td>0</td>\n      <td>0</td>\n      <td>0</td>\n      <td>0</td>\n      <td>1</td>\n      <td>0</td>\n      <td>../data/3d_train_images_v2/256_256/normal/norm...</td>\n    </tr>\n  </tbody>\n</table>\n<p>2018 rows × 11 columns</p>\n</div>"
+-     },
+-     "execution_count": 4,
+-     "metadata": {},
+-     "output_type": "execute_result"
+-    }
+-   ],
+-   "source": [
+-    "cfg.dataset.cv.type = \"StratifiedKFold\"\n",
+-    "df = CSFD.data.three_dimensions.get_df(cfg.dataset)\n",
+-    "df"
+-   ],
+-   "metadata": {
+-    "collapsed": false,
+-    "pycharm": {
+-     "name": "#%%\n"
+-    }
+-   }
+-  },
+-  {
+-   "cell_type": "code",
+-   "execution_count": 5,
+-   "outputs": [],
+-   "source": [
+-    "import plotly.express as px"
+-   ],
+-   "metadata": {
+-    "collapsed": false,
+-    "pycharm": {
+-     "name": "#%%\n"
+-    }
+-   }
+-  },
+-  {
+-   "cell_type": "code",
+-   "execution_count": null,
+-   "outputs": [],
+-   "source": [
+-    "fig = px.histogram(df, x=\"patient_overall\", color=\"fold\", barmode=\"group\")\n",
+-    "fig.show()"
+-   ],
+-   "metadata": {
+-    "collapsed": false,
+-    "pycharm": {
+-     "name": "#%%\n",
+-     "is_executing": true
+-    }
+-   }
+-  },
+-  {
+-   "cell_type": "code",
+-   "execution_count": 30,
+-   "outputs": [
+-    {
+-     "data": {
+-      "text/plain": "((128, 256, 256), 8388608)"
+-     },
+-     "execution_count": 30,
+-     "metadata": {},
+-     "output_type": "execute_result"
+-    }
+-   ],
+-   "source": [
+-    "import numpy as np\n",
+-    "import tqdm\n",
+-    "images = np.load(df[\"np_images_path\"].iloc[0])[\"arr_0\"]\n",
+-    "# images = CSFD.data.three_dimensions.resize_depth(images, depth=cfg.dataset.depth, depth_range=cfg.dataset.depth_range, enable_depth_resized_with_cv2=cfg.dataset.enable_depth_resized_with_cv2)\n",
+-    "np.histogram(images.flatten(), bins=np.linspace(0, 255, 300))\n",
+-    "\n",
+-    "images.shape, images.size"
+-   ],
+-   "metadata": {
+-    "collapsed": false,
+-    "pycharm": {
+-     "name": "#%%\n"
+-    }
+-   }
+-  },
+-  {
+-   "cell_type": "code",
+-   "execution_count": null,
+-   "outputs": [],
+-   "source": [
+-    "fig = px.imshow(images[20:30],\n",
+-    "                animation_frame=0,\n",
+-    "                color_continuous_scale='gray',\n",
+-    "                zmin=0, zmax=255\n",
+-    "                )\n",
+-    "fig.show()"
+-   ],
+-   "metadata": {
+-    "collapsed": false,
+-    "pycharm": {
+-     "name": "#%%\n",
+-     "is_executing": true
+-    }
+-   }
+-  },
+-  {
+-   "cell_type": "code",
+-   "execution_count": null,
+-   "outputs": [],
+-   "source": [],
+-   "metadata": {
+-    "collapsed": false,
+-    "pycharm": {
+-     "name": "#%%\n"
+-    }
+-   }
+-  }
+- ],
+- "metadata": {
+-  "kernelspec": {
+-   "display_name": "Python 3",
+-   "language": "python",
+-   "name": "python3"
+-  },
+-  "language_info": {
+-   "codemirror_mode": {
+-    "name": "ipython",
+-    "version": 2
+-   },
+-   "file_extension": ".py",
+-   "mimetype": "text/x-python",
+-   "name": "python",
+-   "nbconvert_exporter": "python",
+-   "pygments_lexer": "ipython2",
+-   "version": "2.7.6"
+-  }
+- },
+- "nbformat": 4,
+- "nbformat_minor": 0
+-}
+\ No newline at end of file
+diff --git a/visualize/plot.py b/visualize/plot.py
+deleted file mode 100644
+index bba879c..0000000
+--- a/visualize/plot.py
++++ /dev/null
+@@ -1,26 +0,0 @@
+-import plotly.express as px
+-import plotly_utility
+-import numpy as np
+-import CSFD.data
+-import attrdict
+-
+-
+-dataset_cfg = attrdict.AttrDict(
+-    type="train",
+-    data_root_path="../rsna-2022-cervical-spine-fracture-detection",
+-    target_columns=["C1", "C2", "C3", "C4", "C5", "C6", "C7"],
+-    cv=dict(
+-        type="KFold",
+-        seed=42,
+-        n_folds=5,
+-        fold=0
+-    )
+-)
+-
+-df = CSFD.data.get_df(dataset_cfg)
+-assert np.all(df[dataset_cfg.target_columns].values.any(axis=1) == df["patient_overall"])
+-
+-fig = px.histogram(
+-    x=df["patient_overall"])
+-plotly_utility.offline.mpl_plot(fig)
+-

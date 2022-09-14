@@ -1,0 +1,65 @@
+diff --git a/monai/models/resnet10_folds4_v5.4.1/resnet10.yaml b/monai/models/resnet10_folds4_v5.4.1/resnet10.yaml
+index 26ad1cc..35b3cc4 100644
+--- a/monai/models/resnet10_folds4_v5.4.1/resnet10.yaml
++++ b/monai/models/resnet10_folds4_v5.4.1/resnet10.yaml
+@@ -44,12 +44,13 @@ dataset:
+   test_batch_size: 2
+ 
+   train_cache_rate: 0
+-  valid_cache_rate: 1
++  valid_cache_rate: 0
+ 
+ 
+ model:
+   seed: 42
+   name: resnet10
++  use_medical_net: false
+   kwargs:
+      n_input_channels: 1
+ 
+diff --git a/monai/resnet10.yaml b/monai/resnet10.yaml
+index 26ad1cc..35b3cc4 100644
+--- a/monai/resnet10.yaml
++++ b/monai/resnet10.yaml
+@@ -44,12 +44,13 @@ dataset:
+   test_batch_size: 2
+ 
+   train_cache_rate: 0
+-  valid_cache_rate: 1
++  valid_cache_rate: 0
+ 
+ 
+ model:
+   seed: 42
+   name: resnet10
++  use_medical_net: false
+   kwargs:
+      n_input_channels: 1
+ 
+diff --git a/monai/wandb/debug-internal.log b/monai/wandb/debug-internal.log
+index 67be4ab..e463983 120000
+--- a/monai/wandb/debug-internal.log
++++ b/monai/wandb/debug-internal.log
+@@ -1 +1 @@
+-run-20220914_131110-2oqna1c6/logs/debug-internal.log
+\ No newline at end of file
++run-20220914_134112-4ysi3c2r/logs/debug-internal.log
+\ No newline at end of file
+diff --git a/monai/wandb/debug.log b/monai/wandb/debug.log
+index effedd7..f24b596 120000
+--- a/monai/wandb/debug.log
++++ b/monai/wandb/debug.log
+@@ -1 +1 @@
+-run-20220914_131110-2oqna1c6/logs/debug.log
+\ No newline at end of file
++run-20220914_134112-4ysi3c2r/logs/debug.log
+\ No newline at end of file
+diff --git a/monai/wandb/latest-run b/monai/wandb/latest-run
+index 2c730bd..6fa7156 120000
+--- a/monai/wandb/latest-run
++++ b/monai/wandb/latest-run
+@@ -1 +1 @@
+-run-20220914_131110-2oqna1c6
+\ No newline at end of file
++run-20220914_134112-4ysi3c2r
+\ No newline at end of file
