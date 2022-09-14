@@ -66,6 +66,7 @@ def load_yaml_config(path):
         },
         "model": {
             "use_multi_sample_dropout": False,
+            "use_medical_net": False
         },
         "train": {
             "early_stopping": False,

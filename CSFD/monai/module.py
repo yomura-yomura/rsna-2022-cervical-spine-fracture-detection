@@ -77,7 +77,7 @@ Available net_name: {available_model_names}
             if self.cfg.train.evaluate_after_steps > 0:
                 self.trainer.limit_val_batches = 0
 
-            if self.cfg.model.name == "resnet10":
+            if self.cfg.model.name == "resnet10" and self.cfg.model.use_medical_net:
                 print("[Info] Load model pretrained by MedicalNet")
                 state_dict = self.model.state_dict()
                 state_dict.update({
