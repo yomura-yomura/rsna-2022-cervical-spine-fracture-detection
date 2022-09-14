@@ -4,6 +4,7 @@ import datetime as dt
 import sys
 
 
+# competition_name = None
 competition_name = "rsna-2022-cervical-spine-fracture-detection"
 # username_to_be_monitored = "Ranchantan"
 # username_to_be_monitored = None

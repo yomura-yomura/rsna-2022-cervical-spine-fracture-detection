@@ -1,7 +1,5 @@
 import monai.transforms
-import pandas as pd
 import numpy as np
-import warnings
 import CSFD.data.three_dimensions
 import CSFD.data.io_with_cfg
 from monai.transforms import (
@@ -38,20 +36,21 @@ def get_transforms(cfg, is_train):
         if hasattr(cfg.train.augmentation, "affine"):
             transforms.append(
                 RandAffined(
-                    keys="data",
+                    keys=["data", "segmentation"],
                     rotate_range=np.deg2rad(cfg.train.augmentation.affine.rotate_range_in_deg),
                     translate_range=np.multiply(
                         [cfg.dataset.depth, *cfg.dataset.image_2d_shape],
                         cfg.train.augmentation.affine.translate_range_in_scale
                     ),
-                    **cfg.train.augmentation.affine.kwargs
+                    **cfg.train.augmentation.affine.kwargs,
+                    allow_missing_keys=True
                 )
             )
 
     transforms += [
         # Lambdad(keys="data", func=normalize_image_wise),
-        EnsureTyped(keys=("data", "label"), dtype=torch.float16, allow_missing_keys=True),
-        ToTensord(keys=("data", "label"))
+        EnsureTyped(keys=("data", "label", "segmentation"), dtype=torch.float16, allow_missing_keys=True),
+        ToTensord(keys=("data", "label", "segmentation"), allow_missing_keys=True)
     ]
     transforms = Compose(transforms)
     transforms.set_random_state(seed=cfg.train.seed)
@@ -67,7 +66,7 @@ def normalize_image_wise(data):
 
 class LoadImage(monai.transforms.MapTransform):
     def __init__(self, cfg_dataset):
-        keys = ["StudyInstanceUID", "np_images_path", "dcm_images_path"]
+        keys = ["StudyInstanceUID", "np_images_path", "dcm_images_path", "nil_segmentations_path"]
         super().__init__(keys, allow_missing_keys=True)
         self.cfg_dataset = cfg_dataset
 
@@ -93,13 +92,33 @@ class LoadImage(monai.transforms.MapTransform):
         images = CSFD.data.io_with_cfg.load_3d_images(images_path, self.cfg_dataset)
 
         if target_columns is None:
-            return {
+            ret = {
                 "uid": uid,
                 "data": images
             }
         else:
-            return {
+            ret = {
                 "uid": uid,
                 "data": images,
                 "label": target_columns
             }
+
+        if self.cfg_dataset.use_segmentations:
+            segmentations = CSFD.data.io.load_segmentations(
+                row["nil_segmentations_path"], separate_in_channels=True
+            )
+            *left_shapes, seg_height, seg_width = segmentations.shape
+            segmentations = segmentations.reshape((-1, seg_height, seg_width))
+            segmentations = np.stack([
+                CSFD.data.io.resize_hw(seg, self.cfg_dataset.image_2d_shape)
+                for seg in segmentations
+            ], axis=0)
+            segmentations = segmentations.reshape((*left_shapes, *self.cfg_dataset.image_2d_shape))
+
+            segmentations = CSFD.data.three_dimensions.resize_depth(
+                segmentations,
+                self.cfg_dataset.depth, self.cfg_dataset.depth_range, self.cfg_dataset.enable_depth_resized_with_cv2
+            )
+            ret["segmentation"] = segmentations / 255
+
+        return ret
