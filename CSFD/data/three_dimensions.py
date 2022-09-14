@@ -50,29 +50,35 @@ def save_all_3d_images(
 
 
 def resize_depth(images: np.ndarray, depth, depth_range, enable_depth_resized_with_cv2):
-    assert images.ndim == 3  # (depth, h/w, w/h)
+    assert images.ndim >= 3  # (..., depth, h/w, w/h)
 
     if depth_range is not None:
         assert len(depth_range) == 2
-        start_idx, end_idx = np.quantile(np.arange(len(images)), depth_range).astype(int)
-        images = images[start_idx:end_idx]
+        start_idx, end_idx = np.quantile(np.arange(images.shape[-3]), depth_range).astype(int)
+        images = images[..., start_idx:end_idx, :, :]
 
     if depth is None:
         return images
 
-    if len(images) < depth:
-        warnings.warn("len(images) < given depth", UserWarning)
+    if images.shape[-3] < depth:
+        warnings.warn("images.shape[-3] < given depth", UserWarning)
 
     if enable_depth_resized_with_cv2:
-        return np.stack([
-            cv2.resize(image, (image.shape[1], depth), interpolation=cv2.INTER_AREA)
-            for image in np.rollaxis(images, axis=1)
-        ], axis=1)
+        images = images.swapaxes(-3, -2)
+        *left_shapes, images_height, images_depth, images_width = images.shape
+        images = images.reshape((-1, images_depth, images_width))
+        images = np.stack([
+            cv2.resize(image, (images_width, depth), interpolation=cv2.INTER_AREA)
+            for image in images
+        ], axis=0)
+        images = images.reshape((*left_shapes, images_height, depth, images_width))
+        images = images.swapaxes(-3, -2)
+        return images
     else:
         indices = np.quantile(
-            np.arange(len(images)), np.linspace(0, 1, depth)
+            np.arange(images.shape[-3]), np.linspace(0, 1, depth)
         ).astype(int)
-        return images[indices]
+        return images[..., indices, :, :]
 
 
 def _get_dicom_paths(dicom_dir_path: pathlib.Path):
@@ -118,8 +124,13 @@ def get_df(cfg_dataset, ignore_invalids=True, n_jobs_to_save_images=-1):
 
     if cfg_dataset.use_segmentations:
         for p in (pathlib.Path(cfg_dataset.data_root_path) / "segmentations").glob("*.nii"):
-            df.loc[df["StudyInstanceUID"] == p.name[:-4], "nil_images_path"] = p
+            df.loc[df["StudyInstanceUID"] == p.name[:-4], "nil_segmentations_path"] = p
         df = df.dropna()
+
+    if cfg_dataset.train_segmentations_path:
+        train_segmentations_path = pathlib.Path(cfg_dataset.train_segmentations_path)
+        df["npz_segmentations_path"] = [train_segmentations_path / f"{uid}.npz" for uid in df["StudyInstanceUID"]]
+        assert all(p.exists() for p in df["npz_segmentations_path"]), "some segmentations files not found"
 
     if cfg_dataset.type_to_load == "npz":
         depth_dir = (

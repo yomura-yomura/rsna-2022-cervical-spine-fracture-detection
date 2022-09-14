@@ -33,6 +33,15 @@ def load_yaml_config(path):
             )
             with omegaconf.open_dict(cfg):
                 setattr(cfg, key, default_value)
+    def _update_recursively_if_not_defined(cfg: dict, base_cfg: dict):
+        for k, v in base_cfg.items():
+            if getattr(cfg, k, None) is None:
+                continue
+            if not isinstance(getattr(cfg, k), dict):
+                assert isinstance(v, dict)
+                _update_recursively_if_not_defined(getattr(cfg, k), v)
+                continue
+            setattr(cfg, k, v)
 
     # Needed just for compatibility
     for cfg_key, default_map_dict in {
@@ -52,7 +61,8 @@ def load_yaml_config(path):
             "use_normalized_batches": False,
             "equalize_adapthist": False,
 
-            "use_segmentations": False
+            "use_segmentations": False,
+            "train_segmentations_path": None
         },
         "model": {
             "use_multi_sample_dropout": False,
@@ -190,12 +200,17 @@ def load_image(dicom_path, image_shape=(256, 256), data_type="u1",
         image = image[:, start_iw:end_iw]
 
     if image_shape is not None:
-        if image.shape[0] < image_shape[0]:
-            warnings.warn("image.shape[0] < given image_shape[0]", UserWarning)
-        if image.shape[1] < image_shape[1]:
-            warnings.warn("image.shape[1] < given image_shape[1]", UserWarning)
-        image = cv2.resize(image, image_shape, interpolation=cv2.INTER_AREA)
+        image = resize_hw(image, image_shape)
     return image
+
+
+def resize_hw(image, image_shape):
+    assert image.ndim == 2  # (h/w, w/h)
+    if image.shape[-2] < image_shape[1]:
+        warnings.warn("image.shape[-2] < given image_shape[1]", UserWarning)
+    if image.shape[-1] < image_shape[0]:
+        warnings.warn("image.shape[-1] < given image_shape[0]", UserWarning)
+    return cv2.resize(image, (image_shape[1], image_shape[0]), interpolation=cv2.INTER_AREA)
 
 
 def get_submission_df(dataset_cfg):
@@ -213,11 +228,21 @@ def get_submission_df(dataset_cfg):
     return df
 
 
-def load_segmentations(nil_path):
+def load_segmentations(nil_path, separate_in_channels=False):
     nil_file = nib.load(nil_path)
     segmentations = np.asarray(nil_file.get_fdata(dtype="f2"), dtype="u1")
     # segmentations[:] = np.flip(segmentations, axis=-1)
     segmentations[:] = np.rot90(segmentations, axes=(0, 1))
     segmentations = np.rollaxis(segmentations, axis=-1)
     segmentations[segmentations > 7] = 0  # exclude labels of T1 to T12
+
+    if separate_in_channels:
+        segmentations = np.stack(
+            [segmentations == label for label in np.unique(segmentations[segmentations > 0])],
+            axis=0
+        )
+        segmentations = segmentations.astype("u1")
+
+    segmentations *= 255
+
     return segmentations

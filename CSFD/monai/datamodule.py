@@ -66,13 +66,15 @@ class CSFDDataset(torch.utils.data.Dataset):
 
 
 class CSFDDataModule(LightningDataModule):
-    def __init__(self, cfg, df):
+    def __init__(self, cfg, df=None):
         super().__init__()
 
         self.cfg = cfg
-        self.df = df
 
-        # self.df = _data_module.get_df(self.cfg.dataset)
+        if df is None:
+            self.df = CSFD.data.get_df(self.cfg.dataset)
+        else:
+            self.df = df
 
         # other configs
         self.num_workers = (
@@ -81,8 +83,7 @@ class CSFDDataModule(LightningDataModule):
             else os.cpu_count()
         )
 
-        # need to be filled in setup()
-        self.test_table = []
+        # need to be defined in setup()
         self.train_dataset = None
         self.valid_dataset = None
         self.test_dataset = None
@@ -96,10 +97,6 @@ class CSFDDataModule(LightningDataModule):
 
     def setup(self, stage=None):
         if stage == "fit":
-            # self.train_dataset = CSFDDataset(
-            #     self.df[self.df["fold"] != self.cfg.dataset.cv.fold],
-            #     self.cfg.dataset
-            # )
             self.train_dataset = CacheDataset(
                 self.df[self.df["fold"] != self.cfg.dataset.cv.fold].to_dict("records"),
                 CSFD.monai.transforms.get_transforms(self.cfg, is_train=True),
@@ -107,10 +104,6 @@ class CSFDDataModule(LightningDataModule):
             )
             logging.info(f"training dataset: {len(self.train_dataset)}")
         if stage in ("fit", "validate"):
-            # self.valid_dataset = CSFDDataset(
-            #     self.df[self.df["fold"] == self.cfg.dataset.cv.fold],
-            #     self.cfg.dataset
-            # )
             self.valid_dataset = CacheDataset(
                 self.df[self.df["fold"] == self.cfg.dataset.cv.fold].to_dict("records"),
                 CSFD.monai.transforms.get_transforms(self.cfg, is_train=False),

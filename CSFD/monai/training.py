@@ -41,6 +41,7 @@ def train(cfg):
         ModelCheckpoint(
             dirpath=pathlib.Path(cfg.train.model_path) / "checkpoints",
             filename=name,
+            verbose=True,
             monitor="valid/loss",
             mode="min",
             save_weights_only=True,
