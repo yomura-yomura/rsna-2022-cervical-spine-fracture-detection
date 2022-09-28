@@ -19,4 +19,4 @@ model:
 
 base:
   PROJECT_NAME: "RSNA_2022"
-  MODEL_NAME: "effnet_reproduct"
+  MODEL_NAME: "effnet_new_window"
