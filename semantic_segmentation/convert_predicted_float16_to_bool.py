@@ -2,7 +2,7 @@ import pathlib
 import numpy as np
 import tqdm
 
-predicted_data_dir_path = pathlib.Path("predicted_data")
+predicted_data_dir_path = pathlib.Path("predicted_data3")
 
 src_dir_path = predicted_data_dir_path / "float16"
 dst_dir_path = predicted_data_dir_path / "uint8"

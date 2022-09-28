@@ -9,7 +9,7 @@ import pathlib
 from collections.abc import Iterable
 
 
-def train(cfg):
+def train(cfg, module_class=CSFD.monai.CSFDModule, datamodule_class=CSFD.monai.CSFDDataModule):
     if cfg.dataset.cv.fold is None:
         cfg.dataset.cv.fold = list(range(cfg.dataset.cv.n_folds))
         train(cfg)
@@ -24,8 +24,8 @@ def train(cfg):
     df = CSFD.data.three_dimensions.get_df(cfg.dataset)
     seed_everything(cfg.train.seed)
 
-    module = CSFD.monai.CSFDModule(cfg)
-    datamodule = CSFD.monai.CSFDDataModule(cfg, df)
+    module = module_class(cfg)
+    datamodule = datamodule_class(cfg, df)
 
     name = "_".join(
         [

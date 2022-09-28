@@ -27,7 +27,8 @@ def load_3d_images(image_path, cfg_dataset):
             cfg_dataset.enable_depth_resized_with_cv2,
             cfg_dataset.data_type,
             depth=cfg_dataset.depth, depth_range=cfg_dataset.depth_range,
-            n_jobs=1
+            n_jobs=1,
+            voi_lut=cfg_dataset.use_voi_lut
         )
     else:
         raise RuntimeError

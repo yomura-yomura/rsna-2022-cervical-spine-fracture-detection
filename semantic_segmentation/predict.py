@@ -24,7 +24,7 @@ if __name__ == "__main__":
     df = CSFD.data.three_dimensions.get_df(cfg.dataset, ignore_invalids=False)
     assert len(df) == 2019
 
-    output_path = pathlib.Path("predicted_data") / "float16"
+    output_path = pathlib.Path("predicted_data3") / "float16"
     output_path.mkdir(exist_ok=True, parents=True)
 
     cfg.dataset.use_segmentations = True
@@ -35,9 +35,9 @@ if __name__ == "__main__":
         print(f"* fold {fold}")
 
         target_dir = output_path / f"fold{fold}"
-        if target_dir.exists():
-            print(f"[Info] Skipped {target_dir}")
-            continue
+        # if target_dir.exists():
+        #     print(f"[Info] Skipped {target_dir}")
+        #     continue
 
         target_dir.mkdir(exist_ok=True)
 
@@ -54,8 +54,17 @@ if __name__ == "__main__":
         )
         module = CSFD.monai.CSFDModule.load_from_checkpoint(str(ckpt_path), cfg=cfg, map_location=torch.device("cuda"))
 
-        for i in tqdm.trange(int(np.ceil(len(df) / 10))):
-            target_df = df.iloc[10 * i: 10 * (i + 1)]
+        df["npz_predicted_segmentations_path"] = df["StudyInstanceUID"].map(lambda uid: target_dir / f"{uid}.npz")
+
+        df["is_predicted"] = df["npz_predicted_segmentations_path"].map(lambda p: p.exists())
+        n_exists = np.count_nonzero(df["is_predicted"])
+        if n_exists > 0:
+            print(f"{len(df)} -> {len(df) - n_exists}")
+            df = df[~df["is_predicted"]]
+
+        batch = 50
+        for i in tqdm.trange(int(np.ceil(len(df) / batch)), desc="predict"):
+            target_df = df.iloc[batch * i: batch * (i + 1)]
             datamodule = CSFD.monai.CSFDDataModule(cfg, target_df)
             predicted = tl.predict(module, datamodule)
             with torch.no_grad():
@@ -63,5 +72,5 @@ if __name__ == "__main__":
             predicted = predicted.astype(np.float16)
 
             assert len(predicted) == len(target_df)
-            for data, uid in zip(predicted, target_df["StudyInstanceUID"]):
-                np.savez_compressed(target_dir / f"{uid}.npz", data)
+            for data, p in zip(tqdm.tqdm(predicted, desc="save"), target_df["npz_predicted_segmentations_path"]):
+                np.savez_compressed(p, data)

@@ -8,8 +8,31 @@ import plotly_utility
 import pandas as pd
 import pathlib
 
+
+def get_semantic_segmentation_bb_df(df):
+    df_list = []
+    for uid, p in zip(df["StudyInstanceUID"], tqdm.tqdm(df["npz_segmentations_path"])):
+        for vertex_i, segmentations in enumerate(np.load(p)["arr_0"]):
+            if segmentations.any() == np.False_:
+                print("counts == 0")
+                continue
+            depth_range, height_range, width_range = CSFD.bounding_box.get_3d_bounding_box(segmentations)
+            counts = np.count_nonzero(segmentations, axis=(-2, -1))
+            df = pd.DataFrame({
+                "StudyInstanceUID": uid,
+                "slice_number": np.arange(depth_range[0], depth_range[1] + 1),
+                "type": f"C{vertex_i + 1}",
+                "x0": height_range[0], "x1": height_range[1],
+                "y0": width_range[0], "y1": width_range[1],
+                "count": counts[depth_range[0]: depth_range[1] + 1]
+            })
+            df_list.append(df)
+    return pd.concat(df_list)
+
+
 cfg = CSFD.data.load_yaml_config("SEResNext50.yaml")
 df = CSFD.data.three_dimensions.get_df(cfg.dataset)
+
 
 train_segmentations_path = pathlib.Path(cfg.dataset.train_segmentations_path)
 
@@ -37,6 +60,23 @@ for name in (p.name for p in train_segmentations_path.parent.glob("fold*") if p.
     else:
         segmentation_df = pd.read_csv(target_csv_path)
 
+    import pathlib
+    target_segmentation_bb_root_path = pathlib.Path("semantic_segmentation_bb")
+    target_segmentation_bb_root_path.mkdir(exist_ok=True)
+
+    target_segmentation_bb_path = target_segmentation_bb_root_path / f"train_semantic_segmentation_bb_{name}.csv"
+
+    if target_segmentation_bb_path.exists():
+        semantic_segmentation_bb_df = pd.read_csv(target_segmentation_bb_path)
+    else:
+        print(f"creating {target_segmentation_bb_path}")
+        semantic_segmentation_bb_df = get_semantic_segmentation_bb_df(df)
+        semantic_segmentation_bb_df.to_csv(target_segmentation_bb_path, index=False)
+
+    print(name)
+    break
+
+# new_df.loc[:, df.columns] = df
 
 import plotly_utility.express as pux
 
@@ -83,6 +123,27 @@ fig.update_xaxes(title="width", matches="x3", col=3)
 plotly_utility.subplots.update_xaxes(fig, "inside", title=None)
 plotly_utility.offline.mpl_plot(fig)
 
+for i in range(3):
+    segmentation_df[f"min{i}"] = segmentation_df[f"mean{i}"] - segmentation_df[f"shape{i}"] / 2
+    segmentation_df[f"max{i}"] = segmentation_df[f"mean{i}"] + segmentation_df[f"shape{i}"] / 2
+
+
+for i, size in enumerate([cfg.dataset.depth, *cfg.dataset.image_2d_shape]):
+    segmentation_df[f"min_scale{i}"] = segmentation_df[f"min{i}"] / size
+    segmentation_df[f"max_scale{i}"] = segmentation_df[f"max{i}"] / size
+
+    plotly_utility.offline.mpl_plot(
+        pux.histogram(
+            segmentation_df.melt(
+                "type", [f"min_scale{i}", f"max_scale{i}"], value_name=f"min/max_scale{i}"
+            ),
+            x=f"min/max_scale{i}", color="type"
+        ).update_xaxes(range=[0, 1], dtick=0.1)
+    )
+
+
+for i in range(3):
+    print(np.nanquantile(segmentation_df[f"shape{i}"], [0.8, 0.9, 0.95, 0.99]))
 
 fig = pux.histogram(
     segmentation_df[segmentation_df["count"] < 1000],
@@ -95,3 +156,20 @@ plotly_utility.offline.mpl_plot(
     px.histogram(segmentation_df[segmentation_df["count"] < 1000].sort_values("type"), x="type")
 )
 
+
+count_zero_segmentations_df = segmentation_df[segmentation_df["count"] == 0]["name"].value_counts().reset_index()
+print(count_zero_segmentations_df)
+uid_list = count_zero_segmentations_df["index"].map(lambda npz_name: npz_name[:-4])
+
+uid = uid_list[0]
+npz_path = df[df["StudyInstanceUID"] == uid]["np_images_path"].iloc[0]
+images = np.load(npz_path)["arr_0"]
+import plotly.express as px
+import plotly_utility
+
+fig = px.imshow(images[60], title=uid, color_continuous_scale=px.colors.sequential.gray)
+plotly_utility.offline.mpl_plot(fig)
+
+
+
+segmentation_df

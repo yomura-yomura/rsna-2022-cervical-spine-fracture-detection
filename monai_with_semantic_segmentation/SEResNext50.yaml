@@ -1,8 +1,11 @@
 dataset:
   type: train
   data_root_path: ../data/rsna-2022-cervical-spine-fracture-detection/
-  train_3d_images: ../data/3d_train_images_v3/
-  train_segmentations_path: ../semantic_segmentation/predicted_data/uint8/fold0/
+  train_3d_images: ../data/3d_train_images_v4/
+  train_segmentations_path: ../semantic_segmentation/predicted_data3/uint8/fold0/
+
+  semantic_segmentation_bb_path: ../monai_with_semantic_segmentation/semantic_segmentation_bb/train_semantic_segmentation_bb_fold0.csv
+  common_shape_for_bb: [41, 122, 142]
 
   use_segmentations: false
 

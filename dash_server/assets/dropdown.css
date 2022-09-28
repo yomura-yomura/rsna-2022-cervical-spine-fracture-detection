@@ -1,0 +1,36 @@
+div.Select-control {
+    background-color: #222 !important;
+}
+
+div.Select.is-focused > div.Select-control {
+    background-color: #222;
+}
+
+#school-input {
+    color: white;
+}
+
+span.Select-value-label {
+    color: white !important;
+}
+
+div.Select--single > div.Select-control div.Select-value, div.Select-placeholder {
+    border: 1px solid grey;
+    border-radius: 4px;
+}
+
+.VirtualizedSelectOption {
+    background-color: #222;
+    color: white;
+ }
+
+.VirtualizedSelectFocusedOption {
+    background-color: #222;
+    opacity: .7;
+}
+
+div.Select.is-focused:not(.is-open) > div.Select-control {
+    background-color: #222;
+    border-color: var(--primary);
+    box-shadow: none;
+}

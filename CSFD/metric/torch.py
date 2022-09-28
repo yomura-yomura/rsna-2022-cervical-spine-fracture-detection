@@ -23,12 +23,12 @@ competition_weights = {
 }
 
 
-def competition_loss_with_logits(y_hat: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
+def competition_loss_with_logits(logits: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
     """
     y_hat.shape = (batch_size, num_classes)
     y.shape = (batch_size, num_classes)
     """
-    loss = loss_fn(y_hat, y)
+    loss = loss_fn(logits, y)
     weights = y * competition_weights['+'].cuda() + (1 - y) * competition_weights['-'].cuda()
     weights /= torch.sum(weights, dim=1, keepdim=True)
     loss *= weights

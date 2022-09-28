@@ -60,8 +60,8 @@ def resize_depth(images: np.ndarray, depth, depth_range, enable_depth_resized_wi
     if depth is None:
         return images
 
-    if images.shape[-3] < depth:
-        warnings.warn("images.shape[-3] < given depth", UserWarning)
+    # if images.shape[-3] < depth:
+    #     warnings.warn("images.shape[-3] < given depth", UserWarning)
 
     if enable_depth_resized_with_cv2:
         images = images.swapaxes(-3, -2)
@@ -97,7 +97,7 @@ def _get_dicom_paths(dicom_dir_path: pathlib.Path):
 
 def load_3d_images(
     dicom_dir_path, image_2d_shape=None, enable_depth_resized_with_cv2=True, data_type="f4",
-    n_jobs=-1, depth=None, depth_range=None, height_range=None, width_range=None
+    n_jobs=-1, depth=None, depth_range=None, height_range=None, width_range=None, voi_lut=False
 ):
     dicom_dir_path = pathlib.Path(dicom_dir_path)
     if not dicom_dir_path.exists():
@@ -132,7 +132,10 @@ def get_df(cfg_dataset, ignore_invalids=True, n_jobs_to_save_images=-1):
     if cfg_dataset.train_segmentations_path:
         train_segmentations_path = pathlib.Path(cfg_dataset.train_segmentations_path)
         df["npz_segmentations_path"] = [train_segmentations_path / f"{uid}.npz" for uid in df["StudyInstanceUID"]]
-        assert all(p.exists() for p in df["npz_segmentations_path"]), "some segmentations files not found"
+        does_exist = df["npz_segmentations_path"].map(lambda p: p.exists())
+        if np.any(does_exist):
+            warnings.warn(f"{np.count_nonzero(does_exist):,} npz_segmentations_path not found.")
+            df.loc[~does_exist, "npz_segmentations_path"] = np.nan
 
     if cfg_dataset.type_to_load == "npz":
         depth_dir = (

@@ -8,9 +8,10 @@ print("module loaded", flush=True)
 
 if __name__ == "__main__":
     if len(sys.argv) == 1:
-        yaml_path = "resnet10.yaml"
+        # yaml_path = "resnet10.yaml"
         # yaml_path = "resnet50.yaml"
         # yaml_path = "effnet-bn.yaml"
+        yaml_path = "SEResNext50.yaml"
     else:
         yaml_path = sys.argv[1]
 

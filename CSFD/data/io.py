@@ -62,7 +62,10 @@ def load_yaml_config(path):
             "equalize_adapthist": False,
 
             "use_segmentations": False,
-            "train_segmentations_path": None
+            "train_segmentations_path": None,
+            "semantic_segmentation_bb_path": None,
+
+            "use_voi_lut": False
         },
         "model": {
             "use_multi_sample_dropout": False,
@@ -247,3 +250,15 @@ def load_segmentations(nil_path, separate_in_channels=False):
     segmentations *= 255
 
     return segmentations
+
+
+def load_semantic_segmentation_bb_df(csv_path):
+    semantic_segmentation_bb_df = pd.read_csv(csv_path)
+    semantic_segmentation_bb_df = semantic_segmentation_bb_df.dropna()
+    semantic_segmentation_bb_df["x0"] = np.floor(semantic_segmentation_bb_df["x0"]).astype(int)
+    semantic_segmentation_bb_df["y0"] = np.floor(semantic_segmentation_bb_df["y0"]).astype(int)
+    # semantic_segmentation_bb_df["x1"] = np.ceil(semantic_segmentation_bb_df["x1"]).astype(int)
+    # semantic_segmentation_bb_df["y1"] = np.ceil(semantic_segmentation_bb_df["y1"]).astype(int)
+    semantic_segmentation_bb_df["x1"] = np.floor(semantic_segmentation_bb_df["x1"]).astype(int)
+    semantic_segmentation_bb_df["y1"] = np.floor(semantic_segmentation_bb_df["y1"]).astype(int)
+    return semantic_segmentation_bb_df

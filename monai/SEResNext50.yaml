@@ -9,19 +9,19 @@ dataset:
   enable_depth_resized_with_cv2: true
 
   # Scales to crop images
-  depth_range: [0.1, 0.9]
+#  depth_range: [0.1, 0.9]
 #  depth_range: null
 #  height_range: null
 #  width_range: null
 #  height_range: [0.2, 0.8]
 #  width_range: [0.2, 0.8]
-  height_range: [0.1, 0.8]
-  width_range: [0.15, 0.85]
+#  height_range: [0.1, 0.8]
+#  width_range: [0.15, 0.85]
 
   image_2d_shape: [256, 256]
 #  image_2d_shape: [300, 300]
-#  depth: 256
-  depth: 128
+  depth: 256
+#  depth: 128
 #  depth: 200
 #  depth: 80
 
@@ -43,7 +43,7 @@ dataset:
     fold: null  # null -> run all folds for monai/run.py
 
   num_workers: null  # null -> os.cpu_count()
-  train_batch_size: 8
+  train_batch_size: 4
   valid_batch_size: 8
   test_batch_size: 2
 
