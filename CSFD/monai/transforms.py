@@ -1,13 +1,12 @@
 import monai.transforms
 import numpy as np
-import CSFD.data.three_dimensions
-import CSFD.data.io_with_cfg
+import CSFD.data.io.three_dimensions
+import CSFD.data.io_with_cfg.three_dimensions
 from monai.transforms import (
     Compose,
     RandScaleIntensityd, RandShiftIntensityd,
     RandAffined,
     EnsureTyped,
-    Lambdad,
     ToTensord
 )
 import torch
@@ -87,9 +86,9 @@ class LoadImage(monai.transforms.MapTransform):
         elif self.cfg_dataset.type_to_load == "dcm":
             images_path = row["dcm_images_path"]
         else:
-            raise ValueError(self.cfg_dataset.datatype_to_load)
+            raise ValueError(self.cfg_dataset.type_to_load)
 
-        images = CSFD.data.io_with_cfg.load_3d_images(images_path, self.cfg_dataset)
+        images = CSFD.data.io_with_cfg.three_dimensions.load_3d_images(images_path, self.cfg_dataset)
 
         if target_columns is None:
             ret = {
@@ -104,18 +103,18 @@ class LoadImage(monai.transforms.MapTransform):
             }
 
         if self.cfg_dataset.use_segmentations:
-            segmentations = CSFD.data.io.load_segmentations(
+            segmentations = CSFD.data.io.two_dimensions.load_segmentations(
                 row["nil_segmentations_path"], separate_in_channels=True
             )
             *left_shapes, seg_height, seg_width = segmentations.shape
             segmentations = segmentations.reshape((-1, seg_height, seg_width))
             segmentations = np.stack([
-                CSFD.data.io.resize_hw(seg, self.cfg_dataset.image_2d_shape)
+                CSFD.data.io.two_dimensions.resize_hw(seg, self.cfg_dataset.image_2d_shape)
                 for seg in segmentations
             ], axis=0)
             segmentations = segmentations.reshape((*left_shapes, *self.cfg_dataset.image_2d_shape))
 
-            segmentations = CSFD.data.three_dimensions.resize_depth(
+            segmentations = CSFD.data.io.three_dimensions.resize_depth(
                 segmentations,
                 self.cfg_dataset.depth, self.cfg_dataset.depth_range, self.cfg_dataset.enable_depth_resized_with_cv2
             )

@@ -25,7 +25,8 @@ dataset:
 
   use_normalized_batches: true
   equalize_adapthist: false
-  voi_lut: false
+  use_voi_lut: false
+  use_windowing: true
 
   target_columns: [patient_overall, C1, C2, C3, C4, C5, C6, C7]
   cv:
@@ -39,10 +40,10 @@ dataset:
   valid_batch_size: 2
   test_batch_size: 2
 
-#  train_cache_rate: 0
-#  valid_cache_rate: 0
-  train_cache_rate: 1
-  valid_cache_rate: 1
+  train_cache_rate: 0
+  valid_cache_rate: 0
+#  train_cache_rate: 1
+#  valid_cache_rate: 1
 
   use_segmentations: true
 
@@ -102,7 +103,7 @@ train:
 #  name_suffix: v5.3.1
   name_suffix: v5.5
 
-  model_path: models4
+  model_path: models5
 
   early_stopping: false
 

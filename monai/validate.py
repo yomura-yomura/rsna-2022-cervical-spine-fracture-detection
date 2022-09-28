@@ -1,7 +1,7 @@
 import pathlib
 import pandas as pd
 import CSFD.monai.from_checkpoint
-import CSFD.data.three_dimensions
+import CSFD.data.io.three_dimensions
 import CSFD.metric
 import numpy as np
 import sys
@@ -29,9 +29,9 @@ if __name__ == "__main__":
     for fold in range(cfg.dataset.cv.n_folds):
         if fold in predicted_csv_paths.keys():
             predicted_csv_path = predicted_csv_paths[fold]
-            df = CSFD.data.three_dimensions.get_df(cfg.dataset, ignore_invalids=False)
+            df = CSFD.data.io.three_dimensions.get_df(cfg.dataset, ignore_invalids=False)
             predicted_df = pd.read_csv(predicted_csv_path)
-            df, predicted_df = CSFD.data.io.drop_invalids(df, predicted_df)
+            df, predicted_df = CSFD.data.io.io.drop_invalids(df, predicted_df)
             assert np.all(predicted_df["StudyInstanceUID"] == df["StudyInstanceUID"])
             predicted = predicted_df[df["fold"] == fold].iloc[:, 1:].to_numpy("f8")
             true = df.loc[df["fold"] == fold, list(cfg.dataset.target_columns)].values
@@ -40,7 +40,7 @@ if __name__ == "__main__":
                 CSFD.metric.numpy.competition_loss(predicted, true)
             )
         else:
-            df = CSFD.data.three_dimensions.get_df(cfg.dataset)
+            df = CSFD.data.io.three_dimensions.get_df(cfg.dataset)
             cv_list.append(
                 CSFD.monai.from_checkpoint.validate(cfg, ckpt_dict[fold], df)
             )

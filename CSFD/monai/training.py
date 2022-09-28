@@ -1,6 +1,6 @@
 import CSFD.monai
 import CSFD.data
-import CSFD.data.three_dimensions
+import CSFD.data.io.three_dimensions
 import wandb
 from pytorch_lightning import Trainer, seed_everything
 from pytorch_lightning.callbacks import LearningRateMonitor, ModelCheckpoint, EarlyStopping
@@ -21,7 +21,7 @@ def train(cfg, module_class=CSFD.monai.CSFDModule, datamodule_class=CSFD.monai.C
             train(cfg)
         return
 
-    df = CSFD.data.three_dimensions.get_df(cfg.dataset)
+    df = CSFD.data.io_with_cfg.three_dimensions.get_df(cfg.dataset)
     seed_everything(cfg.train.seed)
 
     module = module_class(cfg)

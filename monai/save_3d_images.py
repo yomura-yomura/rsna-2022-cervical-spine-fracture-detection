@@ -1,5 +1,5 @@
 import sys
-import CSFD.data.three_dimensions
+import CSFD.data.io.three_dimensions
 
 
 if len(sys.argv) == 1:
@@ -20,7 +20,7 @@ cfg_dataset.width_range = [0.15, 0.85]
 cfg_dataset.save_images_with_specific_height = True
 cfg_dataset.save_images_with_specific_width = True
 
-df = CSFD.data.three_dimensions.get_df(cfg_dataset)
+df = CSFD.data.io.three_dimensions.get_df(cfg_dataset)
 
 
 # import numpy as np

@@ -1,8 +1,6 @@
-import CSFD.data.three_dimensions
+import CSFD.data.io.three_dimensions
 from CSFD.monai.transforms import LoadImage
-import attrdict
-from monai.data import Dataset, DataLoader
-
+from monai.data import Dataset
 
 # dataset_cfg = attrdict.AttrDict(dict(
 #     type="train",
@@ -40,7 +38,7 @@ from monai.data import Dataset, DataLoader
 
 cfg = CSFD.data.load_yaml_config("../monai/resnet10.yaml")
 
-df = CSFD.data.three_dimensions.get_df(cfg.dataset)
+df = CSFD.data.io.three_dimensions.get_df(cfg.dataset)
 cfg.dataset.type_to_load = "npz"
 
 transforms = CSFD.monai.transforms.get_transforms(cfg, is_train=True)

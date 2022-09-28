@@ -1,7 +1,6 @@
 import pathlib
-import pandas as pd
 import CSFD.monai.from_checkpoint
-import CSFD.data.three_dimensions
+import CSFD.data.io.three_dimensions
 import numpy as np
 import sys
 import tqdm
@@ -21,7 +20,7 @@ if __name__ == "__main__":
     cfg.dataset.use_segmentations = False
     # cfg.dataset.test_batch_size = 4
 
-    df = CSFD.data.three_dimensions.get_df(cfg.dataset, ignore_invalids=False)
+    df = CSFD.data.io.three_dimensions.get_df(cfg.dataset, ignore_invalids=False)
     assert len(df) == 2019
 
     output_path = pathlib.Path("predicted_data3") / "float16"

@@ -1,6 +1,6 @@
 import warnings
 
-import CSFD.data.three_dimensions
+import CSFD.data.io.three_dimensions
 import CSFD.bounding_box
 import CSFD.monai
 import numpy as np
@@ -13,8 +13,9 @@ dash.register_page(__name__)
 uid = __name__.replace(".", "_")
 
 
-cfg = CSFD.data.load_yaml_config("../monai_with_semantic_segmentation/SEResNext50.yaml")
-df = CSFD.data.three_dimensions.get_df(cfg.dataset)
+cfg = CSFD.data.io.load_yaml_config("../monai_with_semantic_segmentation/SEResNext50.yaml")
+cfg.dataset.type_to_load = "both"
+df = CSFD.data.io_with_cfg.three_dimensions.get_df(cfg.dataset)
 targets = [f"{uid} (#{i + 1})" for i, uid in enumerate(df["StudyInstanceUID"])]
 
 layout = html.Div([
@@ -40,10 +41,11 @@ layout = html.Div([
 )
 def dropdown_callback(target):
     uid, _ = target.split()
-    preprocessing_types = ["voi_lut"]
+    preprocessing_types = ["voi_lut", "windowing"]
 
     labels = ["normal"] + preprocessing_types
 
+    cfg.dataset.type_to_load = "npz"
     datamodule = CSFD.monai.datamodule.CSFDDataModule(cfg, df)
     datamodule.setup("predict")
     dataset : CSFD.monai.datamodule.CacheDataset = datamodule.test_dataset
@@ -56,9 +58,11 @@ def dropdown_callback(target):
 
     for p_type in preprocessing_types:
         copied_cfg = cfg.copy()
+        copied_cfg.dataset.type_to_load = "dcm"
         if p_type == "voi_lut":
-            copied_cfg.dataset.type_to_load = "dcm"
             copied_cfg.dataset.use_voi_lut = True
+        elif p_type == "windowing":
+            copied_cfg.dataset.use_windowing = True
         else:
             warnings.warn(f"{p_type} not expected")
             continue
@@ -68,6 +72,7 @@ def dropdown_callback(target):
         dataset: CSFD.monai.datamodule.CacheDataset = datamodule.test_dataset
         data_list.append(dataset[idx]["data"][0].numpy())
 
+    print("plot")
     fig = px.imshow(
         np.stack(data_list, axis=0),
         color_continuous_scale="gray", range_color=[0, 1],

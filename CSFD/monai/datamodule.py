@@ -5,12 +5,11 @@ from pytorch_lightning import LightningDataModule
 import os
 from torch.utils.data import Dataset
 import numpy as np
-import pandas as pd
 import torch
 import torch.nn.functional
 import CSFD.data
-import CSFD.data.three_dimensions
-import CSFD.data.io_with_cfg
+import CSFD.data.io.three_dimensions
+import CSFD.data.io_with_cfg.three_dimensions
 import CSFD.monai.transforms
 from monai.data import CacheDataset, DataLoader
 
@@ -153,7 +152,7 @@ class Cropped3DDataset(Dataset):
         self.cfg = cfg
         self.dataset = dataset
         self.dataset_uid_array = np.array([record["StudyInstanceUID"] for record in self.dataset.data])
-        self.semantic_segmentation_bb_df = CSFD.data.io.load_semantic_segmentation_bb_df(
+        self.semantic_segmentation_bb_df = CSFD.data.io.two_dimensions.load_semantic_segmentation_bb_df(
             self.cfg.dataset.semantic_segmentation_bb_path
         )
         self.unique_id = np.unique(self.semantic_segmentation_bb_df[["StudyInstanceUID", "type"]].to_numpy(str), axis=0)

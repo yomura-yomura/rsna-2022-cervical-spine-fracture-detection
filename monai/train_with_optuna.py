@@ -8,7 +8,7 @@ import sys
 import optuna
 import pathlib
 import CSFD.monai.from_checkpoint
-import CSFD.data.three_dimensions
+import CSFD.data.io.three_dimensions
 
 
 def objective(trial: optuna.Trial):
@@ -43,7 +43,7 @@ def objective(trial: optuna.Trial):
     CSFD.monai.training.train(cfg)
 
     cfg, ckpt_dict = CSFD.monai.from_checkpoint.load_cfg_and_checkpoints(model_path)
-    df = CSFD.data.three_dimensions.get_df(cfg.dataset)
+    df = CSFD.data.io.three_dimensions.get_df(cfg.dataset)
     return CSFD.monai.from_checkpoint.validate(cfg, ckpt_dict[cfg.dataset.cv.fold], df)
 
 

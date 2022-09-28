@@ -8,7 +8,8 @@ import numpy as np
 import pathlib
 import joblib
 import skimage.exposure
-from . import io as _io_module
+from CSFD.data import io as _io_module
+from CSFD.data import io_with_cfg as _io_with_cfg_module
 
 
 def save_all_3d_images(
@@ -81,7 +82,7 @@ def resize_depth(images: np.ndarray, depth, depth_range, enable_depth_resized_wi
         return images[..., indices, :, :]
 
 
-def _get_dicom_paths(dicom_dir_path: pathlib.Path):
+def get_dicom_paths(dicom_dir_path: pathlib.Path):
     dicom_paths = sorted(
         dicom_dir_path.glob("*"),
         key=lambda p: int(p.name.split(".")[0])
@@ -97,22 +98,31 @@ def _get_dicom_paths(dicom_dir_path: pathlib.Path):
 
 def load_3d_images(
     dicom_dir_path, image_2d_shape=None, enable_depth_resized_with_cv2=True, data_type="f4",
-    n_jobs=-1, depth=None, depth_range=None, height_range=None, width_range=None, voi_lut=False
+    n_jobs=-1, depth=None, depth_range=None, height_range=None, width_range=None, voi_lut=False,
+    widowing=False
 ):
     dicom_dir_path = pathlib.Path(dicom_dir_path)
     if not dicom_dir_path.exists():
         raise FileNotFoundError(dicom_dir_path)
-    dicom_paths = _get_dicom_paths(dicom_dir_path)
+    dicom_paths = get_dicom_paths(dicom_dir_path)
 
     if n_jobs == 1:
         images = [
-            _io_module.load_image(dicom_path, image_2d_shape, data_type, height_range, width_range, voi_lut)
+            _io_module.two_dimensions.load_image(
+                dicom_path, image_2d_shape, data_type,
+                height_range, width_range,
+                voi_lut, True,
+                widowing
+            )
             for dicom_path in dicom_paths
         ]
     else:
         images = joblib.Parallel(n_jobs=n_jobs)(
-            joblib.delayed(_io_module.load_image)(
-                dicom_path, image_2d_shape, data_type, height_range, width_range, voi_lut
+            joblib.delayed(_io_module.two_dimensions.load_image)(
+                dicom_path, image_2d_shape, data_type,
+                height_range, width_range,
+                voi_lut, True,
+                widowing
             )
             for dicom_path in dicom_paths
         )
@@ -121,76 +131,94 @@ def load_3d_images(
     return resize_depth(images, depth, depth_range, enable_depth_resized_with_cv2)
 
 
-def get_df(cfg_dataset, ignore_invalids=True, n_jobs_to_save_images=-1):
-    df = _io_module.get_df(cfg_dataset, ignore_invalid=ignore_invalids)
+def get_df(
+        data_root_path, type,
+        type_to_load,
+        train_3d_images=None, data_type=None,
+        depth=None, depth_range=None, save_images_with_specific_depth=False,
+        image_2d_shape=None,
+        height_range=None, save_images_with_specific_height=False,
+        width_range=None, save_images_with_specific_width=False,
+        enable_depth_resized_with_cv2=True,
 
-    if cfg_dataset.use_segmentations:
-        for p in (pathlib.Path(cfg_dataset.data_root_path) / "segmentations").glob("*.nii"):
+        cv=None, target_columns=None,
+        use_segmentations=False, train_segmentations_path=None,
+
+        ignore_invalids=True, n_jobs_to_save_images=-1
+):
+    df = _io_module.two_dimensions.get_df(
+        data_root_path, type, cv, target_columns,
+        ignore_invalid=ignore_invalids
+    )
+
+    if use_segmentations:
+        for p in (pathlib.Path(data_root_path) / "segmentations").glob("*.nii"):
             df.loc[df["StudyInstanceUID"] == p.name[:-4], "nil_segmentations_path"] = p
         df = df.dropna()
 
-    if cfg_dataset.train_segmentations_path:
-        train_segmentations_path = pathlib.Path(cfg_dataset.train_segmentations_path)
+    if train_segmentations_path:
+        train_segmentations_path = pathlib.Path(train_segmentations_path)
         df["npz_segmentations_path"] = [train_segmentations_path / f"{uid}.npz" for uid in df["StudyInstanceUID"]]
         does_exist = df["npz_segmentations_path"].map(lambda p: p.exists())
         if np.any(does_exist):
             warnings.warn(f"{np.count_nonzero(does_exist):,} npz_segmentations_path not found.")
             df.loc[~does_exist, "npz_segmentations_path"] = np.nan
 
-    if cfg_dataset.type_to_load == "npz":
+    if type_to_load not in ("npz", "dcm", "both"):
+        raise ValueError(type_to_load)
+
+    if type_to_load in ("npz", "both"):
         depth_dir = (
             "_".join([
-                f"{cfg_dataset.depth}",
-                f"{'-'.join(map(str, cfg_dataset.depth_range))}"
+                f"{depth}",
+                f"{'-'.join(map(str, depth_range))}"
             ])
-            if cfg_dataset.save_images_with_specific_depth else
+            if save_images_with_specific_depth else
             "normal"
         )
         height_dir = (
             "_".join([
-                f"{cfg_dataset.image_2d_shape[0]}" if cfg_dataset.image_2d_shape is not None else "normal",
-                f"{'-'.join(map(str, cfg_dataset.height_range or [0, 1]))}"
+                f"{image_2d_shape[0]}" if image_2d_shape is not None else "normal",
+                f"{'-'.join(map(str, height_range or [0, 1]))}"
             ])
-            if cfg_dataset.save_images_with_specific_height else
+            if save_images_with_specific_height else
             "normal"
         )
         width_dir = (
             "_".join([
-                f"{cfg_dataset.image_2d_shape[1]}" if cfg_dataset.image_2d_shape is not None else "normal",
-                f"{'-'.join(map(str, cfg_dataset.width_range or [0, 1]))}"
+                f"{image_2d_shape[1]}" if image_2d_shape is not None else "normal",
+                f"{'-'.join(map(str, width_range or [0, 1]))}"
             ])
-            if cfg_dataset.save_images_with_specific_width else
+            if  save_images_with_specific_width else
             "normal"
         )
 
         output_dir_path = (
-            pathlib.Path(cfg_dataset.train_3d_images)
-            / "_".join(map(str, cfg_dataset.image_2d_shape or ["normal"]))
+            pathlib.Path(train_3d_images)
+            / "_".join(map(str, image_2d_shape or ["normal"]))
             / depth_dir
             / height_dir
             / width_dir
-            / np.dtype(cfg_dataset.data_type).name
+            / np.dtype(data_type).name
         )
         save_all_3d_images(
-            images_dir_path=pathlib.Path(cfg_dataset.data_root_path) / f"{cfg_dataset.type}_images",
+            images_dir_path=pathlib.Path(data_root_path) / f"{type}_images",
             output_dir_path=output_dir_path,
-            image_2d_shape=cfg_dataset.image_2d_shape,
-            enable_depth_resized_with_cv2=cfg_dataset.enable_depth_resized_with_cv2,
-            data_type=cfg_dataset.data_type,
-            depth=cfg_dataset.depth,
-            depth_range=cfg_dataset.depth_range,
-            height_range=cfg_dataset.height_range, width_range=cfg_dataset.width_range,
+            image_2d_shape=image_2d_shape,
+            enable_depth_resized_with_cv2=enable_depth_resized_with_cv2,
+            data_type=data_type,
+            depth=depth,
+            depth_range=depth_range,
+            height_range=height_range, width_range=width_range,
             uid_list=df["StudyInstanceUID"],
             n_jobs=n_jobs_to_save_images
         )
         df["np_images_path"] = df["StudyInstanceUID"].map(lambda uid: output_dir_path / f"{uid}.npz")
         if np.all(df["np_images_path"].map(lambda p: p.exists())) == np.False_:
             raise FileNotFoundError
-    elif cfg_dataset.type_to_load == "dcm":
+    if type_to_load in ("dcm", "both"):
         df["dcm_images_path"] = df["StudyInstanceUID"].map(
-            lambda uid: pathlib.Path(cfg_dataset.data_root_path) / f"{cfg_dataset.type}_images" / uid
+            lambda uid: pathlib.Path(data_root_path) / f"{type}_images" / uid
         )
-    else:
-        raise ValueError(cfg_dataset.type_to_load)
 
     return df

@@ -1,4 +1,4 @@
-import CSFD.data.three_dimensions
+import CSFD.data.io.three_dimensions
 import CSFD.bounding_box
 import numpy as np
 import itertools
@@ -31,7 +31,7 @@ def get_semantic_segmentation_bb_df(df):
 
 
 cfg = CSFD.data.load_yaml_config("SEResNext50.yaml")
-df = CSFD.data.three_dimensions.get_df(cfg.dataset)
+df = CSFD.data.io.three_dimensions.get_df(cfg.dataset)
 
 
 train_segmentations_path = pathlib.Path(cfg.dataset.train_segmentations_path)

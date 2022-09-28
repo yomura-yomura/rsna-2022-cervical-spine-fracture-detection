@@ -5,7 +5,7 @@ import re
 import numpy as np
 import CSFD.metric.numpy
 import CSFD.data
-import CSFD.data.three_dimensions
+import CSFD.data.io.three_dimensions
 import gc
 import tqdm
 
@@ -30,7 +30,7 @@ def load_cfg_and_checkpoints(model_path):
 
 def validate_all_folds(cfg, ckpt_dict, df=None):
     if df is None:
-        df = CSFD.data.three_dimensions.get_df(cfg.dataset)
+        df = CSFD.data.io.three_dimensions.get_df(cfg.dataset)
 
     seed_everything(cfg.model.seed)
 

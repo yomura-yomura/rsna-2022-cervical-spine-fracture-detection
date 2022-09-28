@@ -1,10 +1,10 @@
-import CSFD.data.three_dimensions
+import CSFD.data.io.three_dimensions
 import CSFD.monai.training
 
 
 if __name__ == "__main__":
     cfg = CSFD.data.load_yaml_config("SEResNext50.yaml")
-    df = CSFD.data.three_dimensions.get_df(cfg.dataset)
+    df = CSFD.data.io.three_dimensions.get_df(cfg.dataset)
 
     # df = pd.merge(semantic_segmentation_bb_df, df, how="inner", on="StudyInstanceUID")
     # CSFD.bounding_box.get_3d_bounding_box()

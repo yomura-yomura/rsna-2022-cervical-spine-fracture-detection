@@ -1,4 +1,4 @@
-import CSFD.data.three_dimensions
+import CSFD.data.io.three_dimensions
 import CSFD.bounding_box
 import CSFD.monai
 import numpy as np
@@ -11,8 +11,8 @@ dash.register_page(__name__)
 uid = __name__.replace(".", "_")
 
 
-cfg = CSFD.data.load_yaml_config("../monai_with_semantic_segmentation/SEResNext50.yaml")
-df = CSFD.data.three_dimensions.get_df(cfg.dataset)
+cfg = CSFD.data.io.load_yaml_config("../monai_with_semantic_segmentation/SEResNext50.yaml")
+df = CSFD.data.io_with_cfg.three_dimensions.get_df(cfg.dataset)
 targets = [f"{uid} (#{i + 1})" for i, uid in enumerate(df["StudyInstanceUID"])]
 
 layout = html.Div([

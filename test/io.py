@@ -1,4 +1,4 @@
-import CSFD.data.three_dimensions
+import CSFD.data.io.three_dimensions
 import attrdict
 
 dataset_cfg = attrdict.AttrDict(dict(
@@ -29,9 +29,9 @@ dataset_cfg = attrdict.AttrDict(dict(
     )
 ))
 
-df = CSFD.data.three_dimensions.get_df(dataset_cfg)
+df = CSFD.data.io.three_dimensions.get_df(dataset_cfg)
 
 
 dcm_images_path = df["dcm_images_path"].iloc[0]
-images = CSFD.data.three_dimensions.load_3d_images(dcm_images_path)
+images = CSFD.data.io.three_dimensions.load_3d_images(dcm_images_path)
 
