@@ -1,0 +1,67 @@
+diff --git a/CSFD/monai/module.py b/CSFD/monai/module.py
+index 8a57061..f6d50f0 100644
+--- a/CSFD/monai/module.py
++++ b/CSFD/monai/module.py
+@@ -77,14 +77,14 @@ Available net_name: {available_model_names}
+             if self.cfg.train.evaluate_after_steps > 0:
+                 self.trainer.limit_val_batches = 0
+ 
+-            if self.cfg.model.name == "resnet10" and self.cfg.model.use_medical_net:
+-                print("[Info] Load model pretrained by MedicalNet")
+-                state_dict = self.model.state_dict()
+-                state_dict.update({
+-                    k.replace("module.", ""): v
+-                    for k, v in torch.load("../MedicalNet/pretrain/resnet_10_23dataset.pth")["state_dict"].items()
+-                })
+-                self.model.load_state_dict(state_dict)
++            #if self.cfg.model.name == "resnet10" and self.cfg.model.use_medical_net:
++            #    print("[Info] Load model pretrained by MedicalNet")
++            #    state_dict = self.model.state_dict()
++            #    state_dict.update({
++            #        k.replace("module.", ""): v
++            #        for k, v in torch.load("../MedicalNet/pretrain/resnet_10_23dataset.pth")["state_dict"].items()
++            #    })
++            #    self.model.load_state_dict(state_dict)
+ 
+             for n, param in self.named_parameters():
+                 param.requires_grad = True
+diff --git a/monai/resnet10.yaml b/monai/resnet10.yaml
+index 35b3cc4..71f9b91 100644
+--- a/monai/resnet10.yaml
++++ b/monai/resnet10.yaml
+@@ -91,7 +91,7 @@ train:
+ 
+ #  name_suffix: v5.3.1
+ 
+-  name_suffix: v5.4.1
++  name_suffix: v5.4.2
+ 
+   model_path: models
+ 
+diff --git a/monai/wandb/debug-internal.log b/monai/wandb/debug-internal.log
+index 9053589..7a7fef9 120000
+--- a/monai/wandb/debug-internal.log
++++ b/monai/wandb/debug-internal.log
+@@ -1 +1 @@
+-run-20220914_134536-2lhu8n7h/logs/debug-internal.log
+\ No newline at end of file
++run-20220914_135216-rzirrjfw/logs/debug-internal.log
+\ No newline at end of file
+diff --git a/monai/wandb/debug.log b/monai/wandb/debug.log
+index 42d48cc..7b99d89 120000
+--- a/monai/wandb/debug.log
++++ b/monai/wandb/debug.log
+@@ -1 +1 @@
+-run-20220914_134536-2lhu8n7h/logs/debug.log
+\ No newline at end of file
++run-20220914_135216-rzirrjfw/logs/debug.log
+\ No newline at end of file
+diff --git a/monai/wandb/latest-run b/monai/wandb/latest-run
+index 6ed807d..30fc0e9 120000
+--- a/monai/wandb/latest-run
++++ b/monai/wandb/latest-run
+@@ -1 +1 @@
+-run-20220914_134536-2lhu8n7h
+\ No newline at end of file
++run-20220914_135216-rzirrjfw
+\ No newline at end of file

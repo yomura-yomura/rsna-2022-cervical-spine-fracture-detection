@@ -91,7 +91,7 @@ train:
 
 #  name_suffix: v5.3.1
 
-  name_suffix: v5.4.1
+  name_suffix: v5.4.2
 
   model_path: models
 

@@ -1,0 +1,40 @@
+diff --git a/monai/resnet10.yaml b/monai/resnet10.yaml
+index 35b3cc4..71f9b91 100644
+--- a/monai/resnet10.yaml
++++ b/monai/resnet10.yaml
+@@ -91,7 +91,7 @@ train:
+ 
+ #  name_suffix: v5.3.1
+ 
+-  name_suffix: v5.4.1
++  name_suffix: v5.4.2
+ 
+   model_path: models
+ 
+diff --git a/monai/wandb/debug-internal.log b/monai/wandb/debug-internal.log
+index 9053589..1eccbd8 120000
+--- a/monai/wandb/debug-internal.log
++++ b/monai/wandb/debug-internal.log
+@@ -1 +1 @@
+-run-20220914_134536-2lhu8n7h/logs/debug-internal.log
+\ No newline at end of file
++run-20220914_135401-20afzx4m/logs/debug-internal.log
+\ No newline at end of file
+diff --git a/monai/wandb/debug.log b/monai/wandb/debug.log
+index 42d48cc..4759d99 120000
+--- a/monai/wandb/debug.log
++++ b/monai/wandb/debug.log
+@@ -1 +1 @@
+-run-20220914_134536-2lhu8n7h/logs/debug.log
+\ No newline at end of file
++run-20220914_135401-20afzx4m/logs/debug.log
+\ No newline at end of file
+diff --git a/monai/wandb/latest-run b/monai/wandb/latest-run
+index 6ed807d..c9860b0 120000
+--- a/monai/wandb/latest-run
++++ b/monai/wandb/latest-run
+@@ -1 +1 @@
+-run-20220914_134536-2lhu8n7h
+\ No newline at end of file
++run-20220914_135401-20afzx4m
+\ No newline at end of file
