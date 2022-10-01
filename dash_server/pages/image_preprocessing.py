@@ -1,45 +1,49 @@
 import warnings
-
 import CSFD.data.io.three_dimensions
 import CSFD.bounding_box
 import CSFD.monai
 import numpy as np
-import plotly.express as px
 import dash
 from dash import dcc, html, Input, Output, callback
+from .common import *
 
 
 dash.register_page(__name__)
-uid = __name__.replace(".", "_")
+module_uid = __name__.replace(".", "_")
 
 
-cfg = CSFD.data.io.load_yaml_config("../monai_with_semantic_segmentation/SEResNext50.yaml")
-cfg.dataset.type_to_load = "both"
-df = CSFD.data.io_with_cfg.three_dimensions.get_df(cfg.dataset)
-targets = [f"{uid} (#{i + 1})" for i, uid in enumerate(df["StudyInstanceUID"])]
+# cfg = CSFD.data.io.load_yaml_config("../monai_with_semantic_segmentation/SEResNext50.yaml")
+# cfg.dataset.type_to_load = "both"
+# df = CSFD.data.io_with_cfg.three_dimensions.get_df(cfg.dataset)
+# targets = [f"{uid} (#{i + 1})" for i, uid in enumerate(df["StudyInstanceUID"])]
 
-layout = html.Div([
-    html.H2("Image Preprocessing (v0.0)"),
-    html.Hr(),
-    dcc.Dropdown(
-        id=f"my-input-dropdown-{uid}",
-        options=targets, value=targets[3]
-    ),
-    dcc.Loading(
-        id=f"loading-{uid}",
-        children=[
-            dcc.Graph(id=f"my-graph-{uid}", style={"height": "80vh"})
-        ],
-        type="circle"
-    )
-])
+def layout(uid="0", **kwargs):
+    if len(kwargs) > 0:
+        warnings.warn(f"{kwargs} not expected")
+
+    default_target = parse_uid_query(uid)
+    return html.Div([
+        html.H2("Image Preprocessing (v0.0)"),
+        dcc.Dropdown(
+            id=f"my-input-uid-dropdown-{module_uid}",
+            options=targets, value=default_target
+        ),
+        html.Hr(),
+        dcc.Loading(
+            id=f"loading-{module_uid}",
+            children=get_dcc_graph(module_uid),
+            type="circle"
+        )
+    ])
 
 
 @callback(
-    Output(component_id=f"my-graph-{uid}", component_property="figure"),
-    Input(component_id=f"my-input-dropdown-{uid}", component_property="value"),
+    Output(component_id=f"my-graph-{module_uid}", component_property="figure"),
+    Input(component_id=f"my-input-uid-dropdown-{module_uid}", component_property="value"),
 )
 def dropdown_callback(target):
+    if target is None:
+        raise dash.exceptions.PreventUpdate
     uid, _ = target.split()
     preprocessing_types = ["voi_lut", "windowing"]
 

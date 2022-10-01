@@ -12,13 +12,9 @@ dataset:
 #  height_range: [0, 0.7]
 #  width_range: [0, 0.6]
   image_2d_shape: [256, 256]
-  depth: 256
+#  depth: 128
 #  image_2d_shape: [512, 512]
-#  depth: 256
-
-  save_images_with_specific_depth: false
-  save_images_with_specific_height: false
-  save_images_with_specific_width: false
+  depth: 256
 
   type_to_load: npz
 #  type_to_load: dcm
@@ -36,7 +32,7 @@ dataset:
     fold: 0  # null -> run all folds for monai/run.py
 
   num_workers: null  # null -> os.cpu_count()
-  train_batch_size: 1
+  train_batch_size: 2
   valid_batch_size: 2
   test_batch_size: 2
 
@@ -101,9 +97,9 @@ train:
   name_prefix: ""
 
 #  name_suffix: v5.3.1
-  name_suffix: v5.5
+  name_suffix: v5.5.1
 
-  model_path: models5
+  model_path: models6
 
   early_stopping: false
 

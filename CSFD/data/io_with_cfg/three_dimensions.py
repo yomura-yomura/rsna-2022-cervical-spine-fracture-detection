@@ -16,6 +16,7 @@ def get_df(cfg_dataset, ignore_invalids=True, n_jobs_to_save_images=-1):
         cfg_dataset.height_range, cfg_dataset.save_images_with_specific_height,
         cfg_dataset.width_range, cfg_dataset.save_images_with_specific_width,
         cfg_dataset.enable_depth_resized_with_cv2,
+        cfg_dataset.use_windowing,
         
         cfg_dataset.cv, cfg_dataset.target_columns,
         cfg_dataset.use_segmentations, cfg_dataset.train_segmentations_path,
@@ -35,7 +36,23 @@ def load_3d_images(image_path, cfg_dataset):
         else:
             warnings.warn(f"not expected type: {images.dtype}")
 
-        if len(images) != cfg_dataset.depth:
+        if (
+                cfg_dataset.image_2d_shape is not None
+                and
+                (
+                    (images.shape[1] != cfg_dataset.image_2d_shape[0])
+                    or
+                    (images.shape[2] != cfg_dataset.image_2d_shape[1])
+                )
+        ):
+            images = np.stack([
+                CSFD.data.io.two_dimensions.resize_hw(
+                    image, cfg_dataset.image_2d_shape
+                )
+                for image in images
+            ], axis=0)
+
+        if images.shape[0] != cfg_dataset.depth:
             images = CSFD.data.io.three_dimensions.resize_depth(
                 images,
                 cfg_dataset.depth, cfg_dataset.depth_range,

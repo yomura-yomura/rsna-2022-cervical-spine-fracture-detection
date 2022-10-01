@@ -3,13 +3,16 @@ import CSFD.monai.training
 
 
 if __name__ == "__main__":
-    cfg = CSFD.data.load_yaml_config("SEResNext50.yaml")
-    df = CSFD.data.io.three_dimensions.get_df(cfg.dataset)
+    cfg = CSFD.data.io.load_yaml_config("SEResNext50.yaml")
+    df = CSFD.data.io_with_cfg.three_dimensions.get_df(cfg.dataset)
 
     # df = pd.merge(semantic_segmentation_bb_df, df, how="inner", on="StudyInstanceUID")
     # CSFD.bounding_box.get_3d_bounding_box()
-    datamodule = CSFD.monai.datamodule.CSFDCropped3DDataModule(cfg, df)
-    datamodule.setup("fit")
+    # datamodule = CSFD.monai.datamodule.CSFDCropped3DDataModule(cfg, df)
+    # datamodule.setup("fit")
+    # loader = datamodule.train_dataloader()
+    # print("start")
+    # data = next(iter(loader))
 
     CSFD.monai.training.train(
         cfg,

@@ -33,12 +33,17 @@ def get_transforms(cfg, is_train):
                 )
             )
         if hasattr(cfg.train.augmentation, "affine"):
+            if cfg.dataset.semantic_segmentation_bb_path is not None:
+                data_shape = [128, 256, 256] # TODO: hard-coded
+            else:
+                data_shape = [cfg.dataset.depth, *cfg.dataset.image_2d_shape]
+
             transforms.append(
                 RandAffined(
                     keys=["data", "segmentation"],
                     rotate_range=np.deg2rad(cfg.train.augmentation.affine.rotate_range_in_deg),
                     translate_range=np.multiply(
-                        [cfg.dataset.depth, *cfg.dataset.image_2d_shape],
+                        data_shape,
                         cfg.train.augmentation.affine.translate_range_in_scale
                     ),
                     **cfg.train.augmentation.affine.kwargs,
@@ -52,7 +57,8 @@ def get_transforms(cfg, is_train):
         ToTensord(keys=("data", "label", "segmentation"), allow_missing_keys=True)
     ]
     transforms = Compose(transforms)
-    transforms.set_random_state(seed=cfg.train.seed)
+    if is_train:
+        transforms.set_random_state(seed=cfg.train.seed)
     return transforms
 
 

@@ -16,7 +16,7 @@ def load_cfg_and_checkpoints(model_path):
     assert len(_yaml_files) == 1
     yaml_path = _yaml_files[0]
 
-    cfg = CSFD.data.load_yaml_config(yaml_path)
+    cfg = CSFD.data.io.load_yaml_config(yaml_path)
 
     ckpt_dict = {}
     for ckpt_path in sorted(model_path.glob("checkpoints/*.ckpt")):

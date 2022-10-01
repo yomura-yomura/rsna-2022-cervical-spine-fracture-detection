@@ -4,7 +4,7 @@ dataset:
   train_3d_images: ../data/3d_train_images_v4/
   train_segmentations_path: ../semantic_segmentation/predicted_data3/uint8/fold0/
 
-  semantic_segmentation_bb_path: ../monai_with_semantic_segmentation/semantic_segmentation_bb/train_semantic_segmentation_bb_fold0.csv
+  semantic_segmentation_bb_path: ../semantic_segmentation/models/semantic_segmentation_bb/train_semantic_segmentation_bb_fold0.csv
   common_shape_for_bb: [41, 122, 142]
 
   use_segmentations: false
@@ -15,31 +15,27 @@ dataset:
   enable_depth_resized_with_cv2: true
 
   # Scales to crop images
-  depth_range: [0.1, 0.9]
+#  depth_range: [0.1, 0.9]
 #  depth_range: null
-  height_range: null
-  width_range: null
+#  height_range: null
+#  width_range: null
 #  height_range: [0.2, 0.8]
 #  width_range: [0.2, 0.8]
 #  height_range: [0.1, 0.8]
 #  width_range: [0.15, 0.85]
 
-  image_2d_shape: [256, 256]
+#  image_2d_shape: [256, 256]
 #  image_2d_shape: [300, 300]
 #  depth: 256
-  depth: 128
+#  depth: 128
 #  depth: 200
 #  depth: 80
-
-  save_images_with_specific_depth: false
-  save_images_with_specific_height: false
-  save_images_with_specific_width: false
 
   type_to_load: npz
 #  type_to_load: dcm
 
   use_normalized_batches: true
-  equalize_adapthist: false  # temp, if true, it takes quite long time
+  use_windowing: true
 
   target_columns: [patient_overall, C1, C2, C3, C4, C5, C6, C7]
   cv:
@@ -48,9 +44,10 @@ dataset:
     n_folds: 4
     fold: null  # null -> run all folds for monai/run.py
 
-  num_workers: null  # null -> os.cpu_count()
-  train_batch_size: 8
-  valid_batch_size: 8
+#  num_workers: null  # null -> os.cpu_count()
+  num_workers: 4
+  train_batch_size: 2
+  valid_batch_size: 4
   test_batch_size: 2
 
   train_cache_rate: 0
@@ -59,6 +56,11 @@ dataset:
 
 model:
   seed: 42
+#  name: EfficientNetBN
+#  kwargs:
+#    model_name: efficientnet-b0
+#    in_channels: 1
+#    pretrained: true
   name: SEResNext50
   kwargs:
     in_channels: 1
@@ -94,20 +96,20 @@ train:
 
   max_epochs: 80
 
-  learning_rate: 8e-5
+  learning_rate: 1e-5
   weight_decay: 0
   name_prefix: ""
 
   name_suffix: v5.4.3
 
-  model_path: models
+  model_path: models2
 
   early_stopping: false
 
-  validation_interval: 0.2
+  validation_interval: 0.01
   evaluate_after_steps: 0
 
-  logging_interval: 10
+  logging_interval: 1
 
   augmentation:
     scale_intensity:

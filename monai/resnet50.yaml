@@ -1,7 +1,7 @@
 dataset:
   type: train
   data_root_path: ../data/rsna-2022-cervical-spine-fracture-detection
-  train_3d_images: ../data/3d_train_images
+  train_3d_images: ../data/3d_train_images_v4
 
   target_columns: [patient_overall, C1, C2, C3, C4, C5, C6, C7]
   cv:

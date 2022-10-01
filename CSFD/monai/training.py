@@ -9,16 +9,16 @@ import pathlib
 from collections.abc import Iterable
 
 
-def train(cfg, module_class=CSFD.monai.CSFDModule, datamodule_class=CSFD.monai.CSFDDataModule):
+def train(cfg, module_class, datamodule_class):
     if cfg.dataset.cv.fold is None:
         cfg.dataset.cv.fold = list(range(cfg.dataset.cv.n_folds))
-        train(cfg)
+        train(cfg, module_class, datamodule_class)
         return
     elif isinstance(cfg.dataset.cv.fold, Iterable):
         for fold in cfg.dataset.cv.fold:
             print(f"* fold {fold}")
             cfg.dataset.cv.fold = fold
-            train(cfg)
+            train(cfg, module_class, datamodule_class)
         return
 
     df = CSFD.data.io_with_cfg.three_dimensions.get_df(cfg.dataset)

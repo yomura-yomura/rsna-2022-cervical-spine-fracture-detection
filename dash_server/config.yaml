@@ -1,0 +1,22 @@
+dataset:
+  type: train
+  data_root_path: ../data/rsna-2022-cervical-spine-fracture-detection/
+  train_3d_images: ../data/3d_train_images_v4/
+  train_segmentations_path: ../semantic_segmentation/predicted_data3/uint8/fold0/
+
+  semantic_segmentation_bb_path: ../semantic_segmentation/models/semantic_segmentation_bb/train_semantic_segmentation_bb_fold0.csv
+  cropped_2d_labels_path: ../data/cropped_2d_labels/cropped_2d_labels.csv
+
+  common_shape_for_bb: [41, 122, 142]
+
+#  type_to_load: npz
+#  type_to_load: dcm
+
+  use_windowing: true
+
+  target_columns: [patient_overall, C1, C2, C3, C4, C5, C6, C7]
+  cv:
+    type: StratifiedKFold
+    seed: 42
+    n_folds: 4
+    fold: null  # null -> run all folds for monai/run.py

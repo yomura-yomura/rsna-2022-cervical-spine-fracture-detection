@@ -48,6 +48,15 @@ Available net_name: {available_model_names}
         self.cfg = cfg
         self.num_classes = len(self.cfg.dataset.target_columns)
 
+        self.n_model_outputs = None
+
+        self.dropouts = None
+        self.Linear = None
+
+        self.model = None
+        self.train_loss_meter = AverageMeter()
+
+    def setup(self, stage: Optional[str] = None) -> None:
         if self.cfg.model.use_multi_sample_dropout:
             self.n_model_outputs = 100
             self.dropouts = [nn.Dropout(p) for p in np.linspace(0.1, 0.5, 5)]
@@ -55,10 +64,6 @@ Available net_name: {available_model_names}
         else:
             self.n_model_outputs = self.num_classes
 
-        self.model = None
-        self.train_loss_meter = AverageMeter()
-
-    def setup(self, stage: Optional[str] = None) -> None:
         model = self._get_model_from_cfg()
         self.model: torch.nn.Module = model(
             **self.cfg.model.kwargs,
@@ -210,5 +215,6 @@ class CSFDCropped3DModule(CSFDModule):
 
     def validation_step(self, batch, batch_idx):
         logits = self.forward(batch)
+
         loss = torch.mean(_metric_torch_module.loss_fn(logits, batch["label"]))
         self._log_validation_loss(loss, logits, batch["label"])

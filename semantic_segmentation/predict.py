@@ -8,9 +8,11 @@ import tqdm
 
 if __name__ == "__main__":
     if len(sys.argv) == 1:
-        model_path = "models2"
+        model_path = "models"
     else:
         model_path = sys.argv[1]
+
+    model_path = pathlib.Path(model_path)
 
     cfg, ckpt_dict = CSFD.monai.from_checkpoint.load_cfg_and_checkpoints(model_path)
     # cfg.dataset.type_to_load = "dcm"
@@ -20,10 +22,10 @@ if __name__ == "__main__":
     cfg.dataset.use_segmentations = False
     # cfg.dataset.test_batch_size = 4
 
-    df = CSFD.data.io.three_dimensions.get_df(cfg.dataset, ignore_invalids=False)
+    df = CSFD.data.io_with_cfg.three_dimensions.get_df(cfg.dataset, ignore_invalids=False)
     assert len(df) == 2019
 
-    output_path = pathlib.Path("predicted_data3") / "float16"
+    output_path = monai_path / "predicted_data" / "float16"
     output_path.mkdir(exist_ok=True, parents=True)
 
     cfg.dataset.use_segmentations = True

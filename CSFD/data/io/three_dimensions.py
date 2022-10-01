@@ -14,7 +14,7 @@ from CSFD.data import io_with_cfg as _io_with_cfg_module
 
 def save_all_3d_images(
     images_dir_path, output_dir_path, image_2d_shape, enable_depth_resized_with_cv2, data_type,
-    depth, depth_range, height_range, width_range,
+    depth, depth_range, height_range, width_range, use_windowing,
     uid_list=None, n_jobs=-1
 ):
     images_dir_path = pathlib.Path(images_dir_path)
@@ -40,7 +40,8 @@ def save_all_3d_images(
         images = load_3d_images(
             dicom_path, image_2d_shape, enable_depth_resized_with_cv2, data_type,
             n_jobs=n_jobs, depth=depth, depth_range=depth_range,
-            height_range=height_range, width_range=width_range
+            height_range=height_range, width_range=width_range,
+            widowing=use_windowing
         )
         np.savez_compressed(output_path, images)
         # np.savez(output_path, images)
@@ -98,8 +99,8 @@ def get_dicom_paths(dicom_dir_path: pathlib.Path):
 
 def load_3d_images(
     dicom_dir_path, image_2d_shape=None, enable_depth_resized_with_cv2=True, data_type="f4",
-    n_jobs=-1, depth=None, depth_range=None, height_range=None, width_range=None, voi_lut=False,
-    widowing=False
+    n_jobs=-1, depth=None, depth_range=None, height_range=None, width_range=None,
+    voi_lut=False, widowing=False
 ):
     dicom_dir_path = pathlib.Path(dicom_dir_path)
     if not dicom_dir_path.exists():
@@ -140,6 +141,7 @@ def get_df(
         height_range=None, save_images_with_specific_height=False,
         width_range=None, save_images_with_specific_width=False,
         enable_depth_resized_with_cv2=True,
+        use_windowing=False,
 
         cv=None, target_columns=None,
         use_segmentations=False, train_segmentations_path=None,
@@ -170,35 +172,30 @@ def get_df(
     if type_to_load in ("npz", "both"):
         depth_dir = (
             "_".join([
-                f"{depth}",
-                f"{'-'.join(map(str, depth_range))}"
+                f"{depth}" if depth is not None else "normal",
+                f"{'-'.join(map(str, depth_range)) if depth_range is not None else 'normal'}"
             ])
-            if save_images_with_specific_depth else
-            "normal"
         )
         height_dir = (
             "_".join([
                 f"{image_2d_shape[0]}" if image_2d_shape is not None else "normal",
-                f"{'-'.join(map(str, height_range or [0, 1]))}"
+                f"{'-'.join(map(str, height_range or [0, 1])) if height_range is not None else 'normal'}"
             ])
-            if save_images_with_specific_height else
-            "normal"
         )
         width_dir = (
             "_".join([
                 f"{image_2d_shape[1]}" if image_2d_shape is not None else "normal",
-                f"{'-'.join(map(str, width_range or [0, 1]))}"
+                f"{'-'.join(map(str, width_range or [0, 1])) if width_range is not None else 'normal'}"
             ])
-            if  save_images_with_specific_width else
-            "normal"
         )
 
         output_dir_path = (
             pathlib.Path(train_3d_images)
+            / ("windowing" if use_windowing else "normal")
             / "_".join(map(str, image_2d_shape or ["normal"]))
-            / depth_dir
-            / height_dir
-            / width_dir
+            / f"d{depth_dir}"
+            / f"h{height_dir}"
+            / f"w{width_dir}"
             / np.dtype(data_type).name
         )
         save_all_3d_images(
@@ -210,8 +207,8 @@ def get_df(
             depth=depth,
             depth_range=depth_range,
             height_range=height_range, width_range=width_range,
-            uid_list=df["StudyInstanceUID"],
-            n_jobs=n_jobs_to_save_images
+            use_windowing=use_windowing,
+            uid_list=df["StudyInstanceUID"], n_jobs=n_jobs_to_save_images
         )
         df["np_images_path"] = df["StudyInstanceUID"].map(lambda uid: output_dir_path / f"{uid}.npz")
         if np.all(df["np_images_path"].map(lambda p: p.exists())) == np.False_:

@@ -30,8 +30,8 @@ def get_semantic_segmentation_bb_df(df):
     return pd.concat(df_list)
 
 
-cfg = CSFD.data.load_yaml_config("SEResNext50.yaml")
-df = CSFD.data.io.three_dimensions.get_df(cfg.dataset)
+cfg = CSFD.data.io.load_yaml_config("SEResNext50.yaml")
+df = CSFD.data.io_with_cfg.three_dimensions.get_df(cfg.dataset)
 
 
 train_segmentations_path = pathlib.Path(cfg.dataset.train_segmentations_path)
