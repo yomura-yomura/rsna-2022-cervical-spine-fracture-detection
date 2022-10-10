@@ -19,14 +19,14 @@ def load_dicom(path):
     This supports loading both regular and compressed JPEG images. 
     See the first sell with `pip install` commands for the necessary dependencies
     """
-    img = dicom.dcmread(path)
+    img = dicom.read_file(path)
     img.PhotometricInterpretation = 'YBR_FULL'
-    data = img.pixel_array
-    data *= float(dicom.get("RescaleSlope"))
-    data += float(dicom.get("RescaleIntercept"))
+    data = img.pixel_array.astype("f4")
+    data *= float(img.get("RescaleSlope"))
+    data += float(img.get("RescaleIntercept"))
 
-    center = _get_first_of_dicom_field_as_int(dicom.get("WindowCenter"))
-    width = _get_first_of_dicom_field_as_int(dicom.get("WindowWidth"))
+    center = _get_first_of_dicom_field_as_int(img.get("WindowCenter"))
+    width = _get_first_of_dicom_field_as_int(img.get("WindowWidth"))
     data[:] = np.clip(data, center - width / 2, center + width / 2)
     
     
