@@ -1,0 +1,121 @@
+dataset:
+  type: train
+  data_root_path: /home/jumpei.uchida/develop/data/rsna
+  train_3d_images: /home/jumpei.uchida/develop/data/rsna/3dimages
+
+#  data_type: u1
+  data_type: f4
+
+  enable_depth_resized_with_cv2: true
+
+  # Scales to crop images
+  depth_range: [0.1, 0.9]
+  height_range: null
+  width_range: null
+#  height_range: [0.2, 0.8]
+#  width_range: [0.2, 0.8]
+
+  image_2d_shape: [256, 256]
+#  image_2d_shape: [300, 300]
+  depth: 128
+#  depth: 200
+#  depth: 80
+
+  save_images_with_specific_depth: false
+  save_images_with_specific_height: false
+  save_images_with_specific_width: false
+
+
+  type_to_load: npz
+#  type_to_load: dcm
+
+  use_normalized_batches: true
+
+  target_columns: [patient_overall, C1, C2, C3, C4, C5, C6, C7]
+  cv:
+    type: StratifiedKFold
+    seed: 42
+    n_folds: 4
+    fold: null  # null -> run all folds for monai/run.py
+
+  num_workers: null  # null -> os.cpu_count()
+  train_batch_size: 2
+  valid_batch_size: 2
+  test_batch_size: 2
+
+  train_cache_rate: 0
+  valid_cache_rate: 0
+
+
+model:
+  seed: 42
+  name: resnet10
+  use_medical_net: false
+  kwargs:
+     n_input_channels: 1
+
+  use_multi_sample_dropout: false
+
+  optimizer:
+    name: AdamW
+    scheduler:
+      name: null
+#      name: cosine
+#      kwargs:
+#        num_warmup_steps: 100
+#        num_training_steps: 500
+#      name: MultiStep
+#      kwargs:
+#        milestones: [300]
+#        gamma: 1e-3
+#      name: CosineAnnealingWarmRestarts
+#      kwargs:
+#        T_0: 100
+#        T_mult: 2
+#        eta_min: 1e-9
+
+
+train:
+  accelerator: gpu
+  devices: 1
+
+  precision: 16
+
+  seed: 42
+
+  max_epochs: 20
+
+  learning_rate: 1e-5
+  weight_decay: 0
+  name_prefix: ""
+
+#  name_suffix: v5.3.1
+
+  name_suffix: v5.4.2
+
+  model_path: models
+
+  early_stopping: false
+
+  validation_interval: 0.2
+  evaluate_after_steps: 0
+
+  logging_interval: 10
+
+  augmentation:
+    scale_intensity:
+      kwargs:
+        factors: [-0.2, 0.2]
+        prob: 0.5
+    shift_intensity:
+      kwargs:
+        offsets: [-0.1, 0.1]
+        prob: 0.5
+    affine:
+      rotate_range_in_deg: 15
+      translate_range_in_scale: 0.0625
+      kwargs:
+        prob: 0.5
+        scale_range: [0.1, 0.1]
+        mode: nearest
+        padding_mode: reflection
