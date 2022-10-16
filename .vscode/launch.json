@@ -1,0 +1,30 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+
+        {
+            "name": "effnet_binary_data",
+            "type": "python",
+            "request": "launch",
+            "program": "${file}",
+            "console": "integratedTerminal",
+            "cwd":"/home/jumpei.uchida/develop/kaggle_1080ti_1_2/rsna-2022-cervical-spine-fracture-detection",
+            "env":{
+                "PYTHONPATH":"/home/jumpei.uchida/.local/share/virtualenvs/rsna-2022-cervical-spine-fracture-detectio--CY1vaQI/lib/python3.9/site-packages"
+            },
+        },
+        {
+            "name": "effnetv2_1",
+            "type": "python",
+            "request": "launch",
+            "program": "${file}",
+            "console": "integratedTerminal",
+            "cwd":"/home/jumpei.uchida/develop/kaggle_1080ti_1_2/rsna-2022-cervical-spine-fracture-detection/effnet/src/model",
+            "env":{
+                "PYTHONPATH":"/home/jumpei.uchida/.local/share/virtualenvs/rsna-2022-cervical-spine-fracture-detectio--CY1vaQI/lib/python3.9/site-packages"
+            },
+
+        },
+
+    ]
+}

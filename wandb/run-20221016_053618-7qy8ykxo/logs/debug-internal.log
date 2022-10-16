@@ -1,0 +1,169 @@
+2022-10-16 05:36:18,402 INFO    StreamThr :843035 [internal.py:wandb_internal():90] W&B internal server running at pid: 843035, started at: 2022-10-16 05:36:18.400017
+2022-10-16 05:36:18,411 DEBUG   HandlerThread:843035 [handler.py:handle_request():141] handle_request: status
+2022-10-16 05:36:18,418 DEBUG   SenderThread:843035 [sender.py:send_request():316] send_request: status
+2022-10-16 05:36:18,424 DEBUG   SenderThread:843035 [sender.py:send():302] send: header
+2022-10-16 05:36:18,424 INFO    WriterThread:843035 [datastore.py:open_for_write():75] open: /home/jumpei.uchida/develop/kaggle_1080ti_1_2/rsna-2022-cervical-spine-fracture-detection/wandb/run-20221016_053618-7qy8ykxo/run-7qy8ykxo.wandb
+2022-10-16 05:36:18,426 DEBUG   SenderThread:843035 [sender.py:send():302] send: run
+2022-10-16 05:36:18,900 DEBUG   HandlerThread:843035 [handler.py:handle_request():141] handle_request: check_version
+2022-10-16 05:36:18,919 INFO    SenderThread:843035 [dir_watcher.py:__init__():216] watching files in: /home/jumpei.uchida/develop/kaggle_1080ti_1_2/rsna-2022-cervical-spine-fracture-detection/wandb/run-20221016_053618-7qy8ykxo/files
+2022-10-16 05:36:18,920 INFO    SenderThread:843035 [sender.py:_start_run_threads():913] run started: 7qy8ykxo with start time 1665898578.384141
+2022-10-16 05:36:18,921 DEBUG   SenderThread:843035 [sender.py:send():302] send: summary
+2022-10-16 05:36:18,922 INFO    SenderThread:843035 [sender.py:_save_file():1156] saving file wandb-summary.json with policy end
+2022-10-16 05:36:18,925 DEBUG   SenderThread:843035 [sender.py:send_request():316] send_request: check_version
+2022-10-16 05:36:18,995 DEBUG   HandlerThread:843035 [handler.py:handle_request():141] handle_request: run_start
+2022-10-16 05:36:19,005 DEBUG   HandlerThread:843035 [meta.py:__init__():35] meta init
+2022-10-16 05:36:19,005 DEBUG   HandlerThread:843035 [meta.py:__init__():50] meta init done
+2022-10-16 05:36:19,006 DEBUG   HandlerThread:843035 [meta.py:probe():216] probe
+2022-10-16 05:36:19,016 DEBUG   HandlerThread:843035 [meta.py:_setup_git():206] setup git
+2022-10-16 05:36:19,049 DEBUG   HandlerThread:843035 [meta.py:_setup_git():213] setup git done
+2022-10-16 05:36:19,049 DEBUG   HandlerThread:843035 [meta.py:_save_pip():54] save pip
+2022-10-16 05:36:19,052 DEBUG   HandlerThread:843035 [meta.py:_save_pip():68] save pip done
+2022-10-16 05:36:19,052 DEBUG   HandlerThread:843035 [meta.py:probe():254] probe done
+2022-10-16 05:36:19,258 DEBUG   SenderThread:843035 [sender.py:send():302] send: files
+2022-10-16 05:36:19,259 INFO    SenderThread:843035 [sender.py:_save_file():1156] saving file wandb-metadata.json with policy now
+2022-10-16 05:36:19,280 DEBUG   HandlerThread:843035 [handler.py:handle_request():141] handle_request: stop_status
+2022-10-16 05:36:19,281 DEBUG   SenderThread:843035 [sender.py:send_request():316] send_request: stop_status
+2022-10-16 05:36:19,468 DEBUG   SenderThread:843035 [sender.py:send():302] send: telemetry
+2022-10-16 05:36:19,870 INFO    Thread-22 :843035 [upload_job.py:push():138] Uploaded file /tmp/tmp_jipekl3wandb/36pdf61t-wandb-metadata.json
+2022-10-16 05:36:19,939 INFO    Thread-18 :843035 [dir_watcher.py:_on_file_created():275] file/dir created: /home/jumpei.uchida/develop/kaggle_1080ti_1_2/rsna-2022-cervical-spine-fracture-detection/wandb/run-20221016_053618-7qy8ykxo/files/requirements.txt
+2022-10-16 05:36:19,940 INFO    Thread-18 :843035 [dir_watcher.py:_on_file_created():275] file/dir created: /home/jumpei.uchida/develop/kaggle_1080ti_1_2/rsna-2022-cervical-spine-fracture-detection/wandb/run-20221016_053618-7qy8ykxo/files/wandb-metadata.json
+2022-10-16 05:36:19,940 INFO    Thread-18 :843035 [dir_watcher.py:_on_file_created():275] file/dir created: /home/jumpei.uchida/develop/kaggle_1080ti_1_2/rsna-2022-cervical-spine-fracture-detection/wandb/run-20221016_053618-7qy8ykxo/files/wandb-summary.json
+2022-10-16 05:36:22,926 INFO    Thread-18 :843035 [dir_watcher.py:_on_file_created():275] file/dir created: /home/jumpei.uchida/develop/kaggle_1080ti_1_2/rsna-2022-cervical-spine-fracture-detection/wandb/run-20221016_053618-7qy8ykxo/files/output.log
+2022-10-16 05:36:24,928 INFO    Thread-18 :843035 [dir_watcher.py:_on_file_modified():292] file/dir modified: /home/jumpei.uchida/develop/kaggle_1080ti_1_2/rsna-2022-cervical-spine-fracture-detection/wandb/run-20221016_053618-7qy8ykxo/files/output.log
+2022-10-16 05:36:26,930 INFO    Thread-18 :843035 [dir_watcher.py:_on_file_modified():292] file/dir modified: /home/jumpei.uchida/develop/kaggle_1080ti_1_2/rsna-2022-cervical-spine-fracture-detection/wandb/run-20221016_053618-7qy8ykxo/files/output.log
+2022-10-16 05:36:28,932 INFO    Thread-18 :843035 [dir_watcher.py:_on_file_modified():292] file/dir modified: /home/jumpei.uchida/develop/kaggle_1080ti_1_2/rsna-2022-cervical-spine-fracture-detection/wandb/run-20221016_053618-7qy8ykxo/files/output.log
+2022-10-16 05:36:30,523 DEBUG   HandlerThread:843035 [handler.py:handle_request():141] handle_request: partial_history
+2022-10-16 05:36:30,526 DEBUG   SenderThread:843035 [sender.py:send():302] send: history
+2022-10-16 05:36:30,527 DEBUG   SenderThread:843035 [sender.py:send():302] send: summary
+2022-10-16 05:36:30,536 INFO    SenderThread:843035 [sender.py:_save_file():1156] saving file wandb-summary.json with policy end
+2022-10-16 05:36:30,935 INFO    Thread-18 :843035 [dir_watcher.py:_on_file_modified():292] file/dir modified: /home/jumpei.uchida/develop/kaggle_1080ti_1_2/rsna-2022-cervical-spine-fracture-detection/wandb/run-20221016_053618-7qy8ykxo/files/wandb-summary.json
+2022-10-16 05:36:31,601 DEBUG   HandlerThread:843035 [handler.py:handle_request():141] handle_request: partial_history
+2022-10-16 05:36:31,605 DEBUG   SenderThread:843035 [sender.py:send():302] send: history
+2022-10-16 05:36:31,606 DEBUG   SenderThread:843035 [sender.py:send():302] send: summary
+2022-10-16 05:36:31,608 INFO    SenderThread:843035 [sender.py:_save_file():1156] saving file wandb-summary.json with policy end
+2022-10-16 05:36:31,936 INFO    Thread-18 :843035 [dir_watcher.py:_on_file_modified():292] file/dir modified: /home/jumpei.uchida/develop/kaggle_1080ti_1_2/rsna-2022-cervical-spine-fracture-detection/wandb/run-20221016_053618-7qy8ykxo/files/wandb-summary.json
+2022-10-16 05:36:32,764 DEBUG   SenderThread:843035 [sender.py:send():302] send: telemetry
+2022-10-16 05:36:32,766 DEBUG   SenderThread:843035 [sender.py:send():302] send: exit
+2022-10-16 05:36:32,766 INFO    SenderThread:843035 [sender.py:send_exit():438] handling exit code: 1
+2022-10-16 05:36:32,767 INFO    SenderThread:843035 [sender.py:send_exit():440] handling runtime: 13
+2022-10-16 05:36:32,767 DEBUG   HandlerThread:843035 [handler.py:handle_request():141] handle_request: poll_exit
+2022-10-16 05:36:32,776 INFO    SenderThread:843035 [sender.py:_save_file():1156] saving file wandb-summary.json with policy end
+2022-10-16 05:36:32,777 INFO    SenderThread:843035 [sender.py:send_exit():446] send defer
+2022-10-16 05:36:32,777 DEBUG   SenderThread:843035 [sender.py:send_request():316] send_request: poll_exit
+2022-10-16 05:36:32,779 DEBUG   HandlerThread:843035 [handler.py:handle_request():141] handle_request: defer
+2022-10-16 05:36:32,779 INFO    HandlerThread:843035 [handler.py:handle_request_defer():164] handle defer: 0
+2022-10-16 05:36:32,780 DEBUG   SenderThread:843035 [sender.py:send_request():316] send_request: defer
+2022-10-16 05:36:32,781 INFO    SenderThread:843035 [sender.py:send_request_defer():455] handle sender defer: 0
+2022-10-16 05:36:32,781 INFO    SenderThread:843035 [sender.py:transition_state():459] send defer: 1
+2022-10-16 05:36:32,782 DEBUG   HandlerThread:843035 [handler.py:handle_request():141] handle_request: defer
+2022-10-16 05:36:32,782 INFO    HandlerThread:843035 [handler.py:handle_request_defer():164] handle defer: 1
+2022-10-16 05:36:32,871 DEBUG   SenderThread:843035 [sender.py:send_request():316] send_request: defer
+2022-10-16 05:36:32,872 INFO    SenderThread:843035 [sender.py:send_request_defer():455] handle sender defer: 1
+2022-10-16 05:36:32,872 INFO    SenderThread:843035 [sender.py:transition_state():459] send defer: 2
+2022-10-16 05:36:32,872 DEBUG   SenderThread:843035 [sender.py:send():302] send: stats
+2022-10-16 05:36:32,874 DEBUG   HandlerThread:843035 [handler.py:handle_request():141] handle_request: defer
+2022-10-16 05:36:32,875 INFO    HandlerThread:843035 [handler.py:handle_request_defer():164] handle defer: 2
+2022-10-16 05:36:32,875 DEBUG   SenderThread:843035 [sender.py:send_request():316] send_request: defer
+2022-10-16 05:36:32,876 INFO    SenderThread:843035 [sender.py:send_request_defer():455] handle sender defer: 2
+2022-10-16 05:36:32,876 INFO    SenderThread:843035 [sender.py:transition_state():459] send defer: 3
+2022-10-16 05:36:32,877 DEBUG   HandlerThread:843035 [handler.py:handle_request():141] handle_request: defer
+2022-10-16 05:36:32,877 INFO    HandlerThread:843035 [handler.py:handle_request_defer():164] handle defer: 3
+2022-10-16 05:36:32,877 DEBUG   SenderThread:843035 [sender.py:send_request():316] send_request: defer
+2022-10-16 05:36:32,878 INFO    SenderThread:843035 [sender.py:send_request_defer():455] handle sender defer: 3
+2022-10-16 05:36:32,878 INFO    SenderThread:843035 [sender.py:transition_state():459] send defer: 4
+2022-10-16 05:36:32,878 DEBUG   HandlerThread:843035 [handler.py:handle_request():141] handle_request: defer
+2022-10-16 05:36:32,879 INFO    HandlerThread:843035 [handler.py:handle_request_defer():164] handle defer: 4
+2022-10-16 05:36:32,880 DEBUG   SenderThread:843035 [sender.py:send():302] send: summary
+2022-10-16 05:36:32,882 INFO    SenderThread:843035 [sender.py:_save_file():1156] saving file wandb-summary.json with policy end
+2022-10-16 05:36:32,882 DEBUG   HandlerThread:843035 [handler.py:handle_request():141] handle_request: poll_exit
+2022-10-16 05:36:32,883 DEBUG   SenderThread:843035 [sender.py:send_request():316] send_request: defer
+2022-10-16 05:36:32,883 INFO    SenderThread:843035 [sender.py:send_request_defer():455] handle sender defer: 4
+2022-10-16 05:36:32,883 INFO    SenderThread:843035 [sender.py:transition_state():459] send defer: 5
+2022-10-16 05:36:32,883 DEBUG   SenderThread:843035 [sender.py:send_request():316] send_request: poll_exit
+2022-10-16 05:36:32,884 DEBUG   HandlerThread:843035 [handler.py:handle_request():141] handle_request: defer
+2022-10-16 05:36:32,885 INFO    HandlerThread:843035 [handler.py:handle_request_defer():164] handle defer: 5
+2022-10-16 05:36:32,885 DEBUG   SenderThread:843035 [sender.py:send_request():316] send_request: defer
+2022-10-16 05:36:32,885 INFO    SenderThread:843035 [sender.py:send_request_defer():455] handle sender defer: 5
+2022-10-16 05:36:32,938 INFO    Thread-18 :843035 [dir_watcher.py:_on_file_modified():292] file/dir modified: /home/jumpei.uchida/develop/kaggle_1080ti_1_2/rsna-2022-cervical-spine-fracture-detection/wandb/run-20221016_053618-7qy8ykxo/files/wandb-summary.json
+2022-10-16 05:36:32,939 INFO    Thread-18 :843035 [dir_watcher.py:_on_file_modified():292] file/dir modified: /home/jumpei.uchida/develop/kaggle_1080ti_1_2/rsna-2022-cervical-spine-fracture-detection/wandb/run-20221016_053618-7qy8ykxo/files/output.log
+2022-10-16 05:36:33,011 DEBUG   HandlerThread:843035 [handler.py:handle_request():141] handle_request: poll_exit
+2022-10-16 05:36:33,176 INFO    SenderThread:843035 [sender.py:transition_state():459] send defer: 6
+2022-10-16 05:36:33,176 DEBUG   SenderThread:843035 [sender.py:send_request():316] send_request: poll_exit
+2022-10-16 05:36:33,177 DEBUG   HandlerThread:843035 [handler.py:handle_request():141] handle_request: defer
+2022-10-16 05:36:33,178 INFO    HandlerThread:843035 [handler.py:handle_request_defer():164] handle defer: 6
+2022-10-16 05:36:33,179 DEBUG   SenderThread:843035 [sender.py:send_request():316] send_request: defer
+2022-10-16 05:36:33,179 INFO    SenderThread:843035 [sender.py:send_request_defer():455] handle sender defer: 6
+2022-10-16 05:36:33,282 DEBUG   HandlerThread:843035 [handler.py:handle_request():141] handle_request: poll_exit
+2022-10-16 05:36:33,939 INFO    Thread-18 :843035 [dir_watcher.py:_on_file_modified():292] file/dir modified: /home/jumpei.uchida/develop/kaggle_1080ti_1_2/rsna-2022-cervical-spine-fracture-detection/wandb/run-20221016_053618-7qy8ykxo/files/config.yaml
+2022-10-16 05:36:34,379 INFO    SenderThread:843035 [sender.py:transition_state():459] send defer: 7
+2022-10-16 05:36:34,379 DEBUG   SenderThread:843035 [sender.py:send_request():316] send_request: poll_exit
+2022-10-16 05:36:34,381 DEBUG   HandlerThread:843035 [handler.py:handle_request():141] handle_request: defer
+2022-10-16 05:36:34,382 INFO    HandlerThread:843035 [handler.py:handle_request_defer():164] handle defer: 7
+2022-10-16 05:36:34,383 DEBUG   SenderThread:843035 [sender.py:send_request():316] send_request: defer
+2022-10-16 05:36:34,383 INFO    SenderThread:843035 [sender.py:send_request_defer():455] handle sender defer: 7
+2022-10-16 05:36:34,383 INFO    SenderThread:843035 [dir_watcher.py:finish():362] shutting down directory watcher
+2022-10-16 05:36:34,485 DEBUG   HandlerThread:843035 [handler.py:handle_request():141] handle_request: poll_exit
+2022-10-16 05:36:34,941 INFO    Thread-18 :843035 [dir_watcher.py:_on_file_modified():292] file/dir modified: /home/jumpei.uchida/develop/kaggle_1080ti_1_2/rsna-2022-cervical-spine-fracture-detection/wandb/run-20221016_053618-7qy8ykxo/files/output.log
+2022-10-16 05:36:34,944 INFO    SenderThread:843035 [dir_watcher.py:finish():392] scan: /home/jumpei.uchida/develop/kaggle_1080ti_1_2/rsna-2022-cervical-spine-fracture-detection/wandb/run-20221016_053618-7qy8ykxo/files
+2022-10-16 05:36:34,945 INFO    SenderThread:843035 [dir_watcher.py:finish():406] scan save: /home/jumpei.uchida/develop/kaggle_1080ti_1_2/rsna-2022-cervical-spine-fracture-detection/wandb/run-20221016_053618-7qy8ykxo/files/config.yaml config.yaml
+2022-10-16 05:36:34,945 INFO    SenderThread:843035 [dir_watcher.py:finish():406] scan save: /home/jumpei.uchida/develop/kaggle_1080ti_1_2/rsna-2022-cervical-spine-fracture-detection/wandb/run-20221016_053618-7qy8ykxo/files/wandb-summary.json wandb-summary.json
+2022-10-16 05:36:34,947 INFO    SenderThread:843035 [dir_watcher.py:finish():406] scan save: /home/jumpei.uchida/develop/kaggle_1080ti_1_2/rsna-2022-cervical-spine-fracture-detection/wandb/run-20221016_053618-7qy8ykxo/files/requirements.txt requirements.txt
+2022-10-16 05:36:34,964 INFO    SenderThread:843035 [dir_watcher.py:finish():406] scan save: /home/jumpei.uchida/develop/kaggle_1080ti_1_2/rsna-2022-cervical-spine-fracture-detection/wandb/run-20221016_053618-7qy8ykxo/files/wandb-metadata.json wandb-metadata.json
+2022-10-16 05:36:34,964 INFO    SenderThread:843035 [dir_watcher.py:finish():406] scan save: /home/jumpei.uchida/develop/kaggle_1080ti_1_2/rsna-2022-cervical-spine-fracture-detection/wandb/run-20221016_053618-7qy8ykxo/files/output.log output.log
+2022-10-16 05:36:34,972 INFO    SenderThread:843035 [sender.py:transition_state():459] send defer: 8
+2022-10-16 05:36:34,972 DEBUG   SenderThread:843035 [sender.py:send_request():316] send_request: poll_exit
+2022-10-16 05:36:34,997 DEBUG   HandlerThread:843035 [handler.py:handle_request():141] handle_request: defer
+2022-10-16 05:36:34,997 INFO    HandlerThread:843035 [handler.py:handle_request_defer():164] handle defer: 8
+2022-10-16 05:36:35,025 DEBUG   SenderThread:843035 [sender.py:send_request():316] send_request: defer
+2022-10-16 05:36:35,025 INFO    SenderThread:843035 [sender.py:send_request_defer():455] handle sender defer: 8
+2022-10-16 05:36:35,026 INFO    SenderThread:843035 [file_pusher.py:finish():171] shutting down file pusher
+2022-10-16 05:36:35,116 DEBUG   HandlerThread:843035 [handler.py:handle_request():141] handle_request: poll_exit
+2022-10-16 05:36:35,116 DEBUG   SenderThread:843035 [sender.py:send_request():316] send_request: poll_exit
+2022-10-16 05:36:35,229 DEBUG   HandlerThread:843035 [handler.py:handle_request():141] handle_request: poll_exit
+2022-10-16 05:36:35,234 DEBUG   SenderThread:843035 [sender.py:send_request():316] send_request: poll_exit
+2022-10-16 05:36:35,364 DEBUG   HandlerThread:843035 [handler.py:handle_request():141] handle_request: poll_exit
+2022-10-16 05:36:35,365 DEBUG   SenderThread:843035 [sender.py:send_request():316] send_request: poll_exit
+2022-10-16 05:36:35,469 DEBUG   HandlerThread:843035 [handler.py:handle_request():141] handle_request: poll_exit
+2022-10-16 05:36:35,470 DEBUG   SenderThread:843035 [sender.py:send_request():316] send_request: poll_exit
+2022-10-16 05:36:35,574 DEBUG   HandlerThread:843035 [handler.py:handle_request():141] handle_request: poll_exit
+2022-10-16 05:36:35,575 DEBUG   SenderThread:843035 [sender.py:send_request():316] send_request: poll_exit
+2022-10-16 05:36:35,657 INFO    Thread-24 :843035 [upload_job.py:push():138] Uploaded file /home/jumpei.uchida/develop/kaggle_1080ti_1_2/rsna-2022-cervical-spine-fracture-detection/wandb/run-20221016_053618-7qy8ykxo/files/wandb-summary.json
+2022-10-16 05:36:35,660 INFO    Thread-26 :843035 [upload_job.py:push():138] Uploaded file /home/jumpei.uchida/develop/kaggle_1080ti_1_2/rsna-2022-cervical-spine-fracture-detection/wandb/run-20221016_053618-7qy8ykxo/files/output.log
+2022-10-16 05:36:35,677 INFO    Thread-25 :843035 [upload_job.py:push():138] Uploaded file /home/jumpei.uchida/develop/kaggle_1080ti_1_2/rsna-2022-cervical-spine-fracture-detection/wandb/run-20221016_053618-7qy8ykxo/files/requirements.txt
+2022-10-16 05:36:35,679 DEBUG   HandlerThread:843035 [handler.py:handle_request():141] handle_request: poll_exit
+2022-10-16 05:36:35,679 DEBUG   SenderThread:843035 [sender.py:send_request():316] send_request: poll_exit
+2022-10-16 05:36:35,689 INFO    Thread-23 :843035 [upload_job.py:push():138] Uploaded file /home/jumpei.uchida/develop/kaggle_1080ti_1_2/rsna-2022-cervical-spine-fracture-detection/wandb/run-20221016_053618-7qy8ykxo/files/config.yaml
+2022-10-16 05:36:35,783 DEBUG   HandlerThread:843035 [handler.py:handle_request():141] handle_request: poll_exit
+2022-10-16 05:36:35,783 DEBUG   SenderThread:843035 [sender.py:send_request():316] send_request: poll_exit
+2022-10-16 05:36:35,887 DEBUG   HandlerThread:843035 [handler.py:handle_request():141] handle_request: poll_exit
+2022-10-16 05:36:35,888 DEBUG   SenderThread:843035 [sender.py:send_request():316] send_request: poll_exit
+2022-10-16 05:36:35,890 INFO    Thread-17 :843035 [sender.py:transition_state():459] send defer: 9
+2022-10-16 05:36:35,892 DEBUG   HandlerThread:843035 [handler.py:handle_request():141] handle_request: defer
+2022-10-16 05:36:35,892 INFO    HandlerThread:843035 [handler.py:handle_request_defer():164] handle defer: 9
+2022-10-16 05:36:35,893 DEBUG   SenderThread:843035 [sender.py:send_request():316] send_request: defer
+2022-10-16 05:36:35,893 INFO    SenderThread:843035 [sender.py:send_request_defer():455] handle sender defer: 9
+2022-10-16 05:36:35,993 DEBUG   HandlerThread:843035 [handler.py:handle_request():141] handle_request: poll_exit
+2022-10-16 05:36:36,406 INFO    SenderThread:843035 [sender.py:transition_state():459] send defer: 10
+2022-10-16 05:36:36,406 DEBUG   SenderThread:843035 [sender.py:send_request():316] send_request: poll_exit
+2022-10-16 05:36:36,408 DEBUG   HandlerThread:843035 [handler.py:handle_request():141] handle_request: defer
+2022-10-16 05:36:36,408 INFO    HandlerThread:843035 [handler.py:handle_request_defer():164] handle defer: 10
+2022-10-16 05:36:36,409 DEBUG   SenderThread:843035 [sender.py:send_request():316] send_request: defer
+2022-10-16 05:36:36,410 INFO    SenderThread:843035 [sender.py:send_request_defer():455] handle sender defer: 10
+2022-10-16 05:36:36,410 INFO    SenderThread:843035 [sender.py:transition_state():459] send defer: 11
+2022-10-16 05:36:36,413 DEBUG   HandlerThread:843035 [handler.py:handle_request():141] handle_request: defer
+2022-10-16 05:36:36,413 INFO    HandlerThread:843035 [handler.py:handle_request_defer():164] handle defer: 11
+2022-10-16 05:36:36,414 DEBUG   SenderThread:843035 [sender.py:send():302] send: final
+2022-10-16 05:36:36,414 DEBUG   SenderThread:843035 [sender.py:send():302] send: footer
+2022-10-16 05:36:36,415 DEBUG   SenderThread:843035 [sender.py:send_request():316] send_request: defer
+2022-10-16 05:36:36,415 INFO    SenderThread:843035 [sender.py:send_request_defer():455] handle sender defer: 11
+2022-10-16 05:36:36,513 DEBUG   HandlerThread:843035 [handler.py:handle_request():141] handle_request: poll_exit
+2022-10-16 05:36:36,514 DEBUG   SenderThread:843035 [sender.py:send_request():316] send_request: poll_exit
+2022-10-16 05:36:36,515 INFO    SenderThread:843035 [file_pusher.py:join():176] waiting for file pusher
+2022-10-16 05:36:36,993 DEBUG   HandlerThread:843035 [handler.py:handle_request():141] handle_request: sampled_history
+2022-10-16 05:36:36,997 DEBUG   HandlerThread:843035 [handler.py:handle_request():141] handle_request: get_summary
+2022-10-16 05:36:37,001 DEBUG   HandlerThread:843035 [handler.py:handle_request():141] handle_request: shutdown
+2022-10-16 05:36:37,002 INFO    HandlerThread:843035 [handler.py:finish():810] shutting down handler
+2022-10-16 05:36:37,416 INFO    WriterThread:843035 [datastore.py:close():279] close: /home/jumpei.uchida/develop/kaggle_1080ti_1_2/rsna-2022-cervical-spine-fracture-detection/wandb/run-20221016_053618-7qy8ykxo/run-7qy8ykxo.wandb
+2022-10-16 05:36:37,889 INFO    SenderThread:843035 [sender.py:finish():1312] shutting down sender
+2022-10-16 05:36:37,890 INFO    SenderThread:843035 [file_pusher.py:finish():171] shutting down file pusher
+2022-10-16 05:36:37,890 INFO    SenderThread:843035 [file_pusher.py:join():176] waiting for file pusher

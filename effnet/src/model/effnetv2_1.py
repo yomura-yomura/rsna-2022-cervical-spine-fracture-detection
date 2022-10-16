@@ -1,31 +1,29 @@
-import gc
-import glob
 import os
-import re
 import sys
+
 sys.path.append(os.path.join(os.path.dirname(__file__), '../../'))
-from src.make_data import effnet_data
-import utils
-from src.model import custom_metric
-import cv2
-import matplotlib.pyplot as plt
+import warnings
+from pathlib import Path
+
 import numpy as np
 import pandas as pd
-import pydicom as dicom
 import torch
 import torchvision as tv
-from sklearn.model_selection import GroupKFold
+import utils
+from src.make_data import effnet_binary_data as effnet_data
 from torch.cuda.amp import GradScaler, autocast
+from torchmetrics import AUROC, Accuracy
 from torchvision.models.feature_extraction import create_feature_extractor
 from tqdm import tqdm
-import warnings
+
 import wandb
-from pathlib import Path
 
 warnings.simplefilter('ignore')
 # SET CONFIG Effnet
 
-cfg = utils.load_yaml(Path("../../config/config.yaml"))
+cfg = utils.load_yaml(Path("../../config/config_temp.yaml"))
+
+#cfg = utils.load_yaml(Path("/home/jumpei.uchida/develop/kaggle_1080ti_1_2/rsna-2022-cervical-spine-fracture-detection/effnet/config/config_temp.yaml"))
 #DATA PATH
 RSNA_2022_PATH = cfg["data"]["RSNA_2022_PATH"]
 TRAIN_IMAGES_PATH = f'{RSNA_2022_PATH}/train_images'
@@ -63,9 +61,16 @@ else:
 df_train = pd.read_csv(f'{RSNA_2022_PATH}/train.csv')
 df_train_slices = pd.read_csv(f'{METADATA_PATH}/train_segmented.csv')
 df_test = pd.read_csv(f'{RSNA_2022_PATH}/test.csv')
+df_train_box = pd.read_csv(f"{RSNA_2022_PATH}/cropped_2d_labels.csv")
 
 #PreProcess and Effnetdata
-df_train,df_train_slices,df_test,df_test_slices = effnet_data.preprocess(df_train = df_train,df_train_slices=df_train_slices,df_test=df_test,TEST_IMAGES_PATH=TEST_IMAGES_PATH,N_FOLDS=N_FOLDS)
+df_train, df_train_slices, df_test, df_test_slices = effnet_data.preprocess( df_train=df_train,
+    df_train_slices=df_train_slices,
+    df_train_box=df_train_box,
+    df_test=df_test,
+    TEST_IMAGES_PATH=TEST_IMAGES_PATH,
+    N_FOLDS=N_FOLDS,
+)
 ds_train = effnet_data.EffnetDataSet(df_train, TRAIN_IMAGES_PATH, WEIGHTS.transforms())
 ds_test = effnet_data.EffnetDataSet(df_test, TEST_IMAGES_PATH, WEIGHTS.transforms())
 
@@ -75,47 +80,44 @@ class EffnetModel(torch.nn.Module):
         effnet = tv.models.efficientnet_v2_s(weights=WEIGHTS)
         self.model = create_feature_extractor(effnet, ['flatten'])
         self.nn_fracture = torch.nn.Sequential(
-            torch.nn.Linear(1280, 7),
-        )
-        self.nn_vertebrae = torch.nn.Sequential(
-            torch.nn.Linear(1280, 7),
+            torch.nn.Linear(1280, 1),
         )
 
     def forward(self, x):
         # returns logits
         x = self.model(x)['flatten']
-        return self.nn_fracture(x), self.nn_vertebrae(x)
+        return self.nn_fracture(x)
 
     def predict(self, x):
-        frac, vert = self.forward(x)
-        return torch.sigmoid(frac), torch.sigmoid(vert)
+        frac = self.forward(x)
+        return torch.sigmoid(frac)
 
 def evaluate_effnet(model: EffnetModel, ds, max_batches=PREDICT_MAX_BATCHES, shuffle=False):
     torch.manual_seed(SEED)
     model = model.to(DEVICE)
     dl_test = torch.utils.data.DataLoader(ds, batch_size=BATCH_SIZE, shuffle=shuffle, num_workers=os.cpu_count(),
                                           collate_fn=utils.filter_nones)
+
     pred_frac = []
-    pred_vert = []
+    valid_list = []
+    auroc = AUROC(pos_label = 1)
     with torch.no_grad():
         model.eval()
         frac_losses = []
-        vert_losses = []
         with tqdm(dl_test, desc='Eval', miniters=1) as progress:
-            for i, (X, y_frac, y_vert) in enumerate(progress):
+            for i, (X, y_frac) in enumerate(progress):
                 with autocast():
-                    y_frac_pred, y_vert_pred = model.forward(X.to(DEVICE))
-                    frac_loss = custom_metric.weighted_loss(y_frac_pred, y_frac.to(DEVICE),DEVICE=DEVICE).item()
+                    y_frac_pred= model.forward(X.to(DEVICE))
+                    #Binary Cross Entoropy
+                    frac_loss = torch.nn.functional.binary_cross_entropy_with_logits(y_frac_pred.to(DEVICE),y_frac.to(DEVICE),reduction='none')
+                    valid_score = auroc(torch.sigmoid(y_frac_pred).to(DEVICE),y_frac.to(DEVICE).to(torch.int64))
 
-                    #Classification of Bones
-                    vert_loss = torch.nn.functional.binary_cross_entropy_with_logits(y_vert_pred, y_vert.to(DEVICE)).item()
+                    valid_list.append(valid_score.cpu())
                     pred_frac.append(torch.sigmoid(y_frac_pred))
-                    pred_vert.append(torch.sigmoid(y_vert_pred))
-                    frac_losses.append(frac_loss)
-                    vert_losses.append(vert_loss)
+                    frac_losses.append(torch.mean(frac_loss).cpu())
                 if i >= max_batches:
                     break
-        return np.mean(frac_losses), np.mean(vert_losses), torch.concat(pred_frac).cpu().numpy(), torch.concat(pred_vert).cpu().numpy()
+        return np.mean(frac_losses), torch.concat(pred_frac).cpu().numpy(),np.mean(valid_list)
 
 def train_effnet(ds_train, ds_eval, logger, name):
     torch.manual_seed(SEED)
@@ -129,14 +131,14 @@ def train_effnet(ds_train, ds_eval, logger, name):
     model.train()
     scaler = GradScaler()
     with tqdm(dl_train, desc='Train', miniters=1) as progress:
-        for batch_idx, (X, y_frac, y_vert) in enumerate(progress):
+        for batch_idx, (X, y_frac) in enumerate(progress):
 
             if ds_eval is not None and batch_idx % SAVE_CHECKPOINT_EVERY_STEP == 0 and EFFNET_MAX_EVAL_BATCHES > 0:
-                frac_loss, vert_loss = evaluate_effnet(
-                    model, ds_eval, max_batches=EFFNET_MAX_EVAL_BATCHES, shuffle=True)[:2]
+                frac_loss,_,valid_score= evaluate_effnet(
+                    model, ds_eval, max_batches=EFFNET_MAX_EVAL_BATCHES, shuffle=True)
                 model.train()
                 logger.log(
-                    {'eval_frac_loss': frac_loss, 'eval_vert_loss': vert_loss, 'eval_loss': frac_loss + vert_loss})
+                    {'eval_loss': frac_loss,'eval_AUC_ROC_SCORE':valid_score})
                 if batch_idx > 0:  # don't save untrained model
                     utils.save_model(name, model)
 
@@ -145,24 +147,23 @@ def train_effnet(ds_train, ds_eval, logger, name):
             optim.zero_grad()
             # Using mixed precision training
             with autocast():
-                y_frac_pred, y_vert_pred = model.forward(X.to(DEVICE))
-                frac_loss = custom_metric.weighted_loss(y_frac_pred, y_frac.to(DEVICE),DEVICE=DEVICE)
-                vert_loss = torch.nn.functional.binary_cross_entropy_with_logits(y_vert_pred, y_vert.to(DEVICE))
-                loss = FRAC_LOSS_WEIGHT * frac_loss + vert_loss
+                y_frac_pred  = model.forward(X.to(DEVICE))
+                loss = torch.nn.functional.binary_cross_entropy_with_logits(y_frac_pred.to(DEVICE),y_frac.to(DEVICE),reduction='none')
+                #loss = torch.mean(loss).cpu()
 
-                if np.isinf(loss.item()) or np.isnan(loss.item()):
+                if np.isinf(np.sum(loss.cpu().detach().numpy()).all()) or np.isnan(loss.cpu().detach().numpy().all()):
                     print(f'Bad loss, skipping the batch {batch_idx}')
-                    del loss, frac_loss, vert_loss, y_frac_pred, y_vert_pred
+                    del loss,  y_frac_pred 
                     utils.gc_collect()
 
             # scaler is needed to prevent "gradient underflow"
-            scaler.scale(loss).backward()
+            scaler.scale(torch.mean(loss)).backward()
             scaler.step(optim)
             scaler.update()
             scheduler.step()
 
-            progress.set_description(f'Train loss: {loss.item() :.02f}')
-            logger.log({'loss': (loss.item()), 'frac_loss': frac_loss.item(), 'vert_loss': vert_loss.item(),
+            progress.set_description(f'Train loss: {torch.mean(loss) :.02f}')
+            logger.log({'loss': torch.mean(loss),
                         'lr': scheduler.get_last_lr()[0]})
     utils.save_model(name, model)
     return model
@@ -171,20 +172,18 @@ def train_effnet(ds_train, ds_eval, logger, name):
 def gen_effnet_predictions(effnet_models, df_train):
     if os.path.exists(os.path.join(EFFNET_CHECKPOINTS_PATH, 'train_{PROJECT_NAME}_{MODEL_NAME}_predictions.csv')):
         print('Found cached version of train_predictions.csv')
-        df_train_predictions = pd.read_csv(os.path.join(EFFNET_CHECKPOINTS_PATH, 'train_{PROJECT_NAME}_{MODEL_NAME}_predictions.csv'))
+        df_eval_effnet_pred = pd.read_csv(os.path.join(EFFNET_CHECKPOINTS_PATH, 'eval_{PROJECT_NAME}_{MODEL_NAME}_predictions.csv'))
     else:
-        df_train_predictions = []
         df_eval_predictions = []
         with tqdm(enumerate(effnet_models), total=len(effnet_models), desc='Folds') as progress:
             for fold, effnet_model in progress:
                 ds_eval = effnet_data.EffnetDataSet(df_train.query('split == @fold'), TRAIN_IMAGES_PATH, WEIGHTS.transforms())
 
                 #valid_prediction
-                eval_frac_loss, eval_vert_loss, eval_effnet_pred_frac, eval_effnet_pred_vert = evaluate_effnet(effnet_model, ds_eval, PREDICT_MAX_BATCHES)
-                progress.set_description(f'Fold score:{eval_frac_loss:.02f}')
-                df_eval_effnet_pred = pd.DataFrame(data=np.concatenate([eval_effnet_pred_frac, eval_effnet_pred_vert], axis=1),
-                                              columns=[f'C{i}_effnet_frac' for i in range(1, 8)] +
-                                                      [f'C{i}_effnet_vert' for i in range(1, 8)])
+                eval_frac_loss, eval_effnet_pred_frac,eval_valid_score = evaluate_effnet(effnet_model, ds_eval, PREDICT_MAX_BATCHES)
+                progress.set_description(f'Fold loss:{eval_frac_loss:.02f}, Fold score:{eval_valid_score:.02f}')
+                df_eval_effnet_pred = pd.DataFrame(data=eval_effnet_pred_frac,
+                                              columns=["pred"])
 
                 df_eval = pd.concat(
                     [df_train.query('split == @fold').head(len(df_eval_effnet_pred)).reset_index(drop=True), df_eval_effnet_pred],
@@ -205,21 +204,18 @@ def patient_prediction(df,frac_cols,vert_cols):
 
 def evaluate(effnet_models,df_train):
     df_eval_pred = gen_effnet_predictions(effnet_models=effnet_models,df_train=df_train)
-    target_cols = ['patient_overall'] + [f'C{i}_fracture' for i in range(1, 8)]
-    frac_cols = [f'C{i}_effnet_frac' for i in range(1, 8)]
-    vert_cols = [f'C{i}_effnet_vert' for i in range(1, 8)]
 
-    df_patient_eval_pred = df_eval_pred.groupby('StudyInstanceUID').apply(lambda df: patient_prediction(df,frac_cols=frac_cols,vert_cols=vert_cols)).to_frame('pred').join(df_eval_pred.groupby('StudyInstanceUID')[target_cols].mean())
-
-
-    fold_data = df_train[["StudyInstanceUID","split"]].drop_duplicates().reset_index(drop = True)
+    df_patient_eval_pred = df_eval_pred.groupby('StudyInstanceUID')[["pred"]].mean()
+    fold_data = df_train.groupby(["StudyInstanceUID","split"])[["patient_overall"]].sum().reset_index()
+    fold_data["patient_overall"] = np.where(fold_data["patient_overall"].values > 0,1,0)
     df_patient_eval_pred = df_patient_eval_pred.merge(fold_data,on  = "StudyInstanceUID",how = "left")
     valid_list = []
     for fold in range(N_FOLDS):
         df_temp  = df_patient_eval_pred.query("split == @fold")
-        eval_targets = df_temp[target_cols].values
+        eval_targets = df_temp['patient_overall'].values
         eval_predictions = np.stack(df_temp.pred.values.tolist())
-        valid_score = custom_metric.weighted_loss(torch.logit(torch.as_tensor(eval_predictions)).to(DEVICE), torch.as_tensor(eval_targets).to(DEVICE))
+        auroc = AUROC(pos_label = 1)
+        valid_score = auroc(torch.as_tensor(eval_predictions),torch.as_tensor(eval_targets))
         valid_list.append(valid_score.cpu())
         print(f'Valid_CV score Fold_{fold}:', valid_score)
     
