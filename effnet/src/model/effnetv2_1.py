@@ -12,7 +12,8 @@ import torchvision as tv
 import utils
 from src.make_data import effnet_binary_data as effnet_data
 from torch.cuda.amp import GradScaler, autocast
-from torchmetrics import AUROC, Accuracy
+from torchmetrics import AUROC
+from torchmetrics.functional import precision_recall,auc
 from torchvision.models.feature_extraction import create_feature_extractor
 from tqdm import tqdm
 
@@ -43,6 +44,7 @@ N_FOLDS = int(cfg["model"]["N_FOLDS"])
 ONE_CYCLE_EPOCH = int(cfg["model"]["ONE_CYCLE_EPOCH"])
 SEED = int(cfg["model"]["SEED"])
 WEIGHTS = tv.models.efficientnet.EfficientNet_V2_S_Weights.DEFAULT
+
 
 # Common
 PROJECT_NAME = cfg["base"]["PROJECT_NAME"]
@@ -97,9 +99,9 @@ def evaluate_effnet(model: EffnetModel, ds, max_batches=PREDICT_MAX_BATCHES, shu
     model = model.to(DEVICE)
     dl_test = torch.utils.data.DataLoader(ds, batch_size=BATCH_SIZE, shuffle=shuffle, num_workers=os.cpu_count(),
                                           collate_fn=utils.filter_nones)
-
     pred_frac = []
     valid_list = []
+    
     auroc = AUROC(pos_label = 1)
     with torch.no_grad():
         model.eval()
@@ -111,7 +113,6 @@ def evaluate_effnet(model: EffnetModel, ds, max_batches=PREDICT_MAX_BATCHES, shu
                     #Binary Cross Entoropy
                     frac_loss = torch.nn.functional.binary_cross_entropy_with_logits(y_frac_pred.to(DEVICE),y_frac.to(DEVICE),reduction='none')
                     valid_score = auroc(torch.sigmoid(y_frac_pred).to(DEVICE),y_frac.to(DEVICE).to(torch.int64))
-
                     valid_list.append(valid_score.cpu())
                     pred_frac.append(torch.sigmoid(y_frac_pred))
                     frac_losses.append(torch.mean(frac_loss).cpu())
