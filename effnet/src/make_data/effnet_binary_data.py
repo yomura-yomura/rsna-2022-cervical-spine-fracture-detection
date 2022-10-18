@@ -59,6 +59,8 @@ def preprocess(
     df_train = df_train.query("StudyInstanceUID == @uid_list | patient_overall == 0")[
         ["StudyInstanceUID", "patient_overall"]
     ].reset_index(drop=True)
+    df_train =pd.concat([df_train.query("patient_overall == 1").reset_index(drop =True),
+                         df_train.query("patient_overall == 0")[:235].reset_index(drop =True)],axis = 0).reset_index(drop =True)
     df_train_box = df_train_box[["StudyInstanceUID", "slice_number", "is_reversed"]]
 
     # Pick reversed Slice
