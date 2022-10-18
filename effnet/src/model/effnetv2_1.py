@@ -170,7 +170,7 @@ def train_effnet(ds_train, ds_eval, logger, name):
     return model
 
 
-def gen_effnet_predictions(effnet_models, df_train):
+def gen_effnet_predictions(effnet_models, df_train,EFFNET_CHECKPOINTS_PATH = EFFNET_CHECKPOINTS_PATH,MODEL_NAME=MODEL_NAME):
     if os.path.exists(os.path.join(EFFNET_CHECKPOINTS_PATH, 'train_{PROJECT_NAME}_{MODEL_NAME}_predictions.csv')):
         print('Found cached version of train_predictions.csv')
         df_eval_effnet_pred = pd.read_csv(os.path.join(EFFNET_CHECKPOINTS_PATH, 'eval_{PROJECT_NAME}_{MODEL_NAME}_predictions.csv'))
