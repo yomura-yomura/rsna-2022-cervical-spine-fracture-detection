@@ -66,14 +66,14 @@ def validate(cfg, checkpoint_path, df):
 #     return predicted_dict
 
 
-def predict(cfg, ckpt_path, df):
+def predict(cfg, ckpt_path, df, module_class, datamodule_class):
     tl = Trainer(
         accelerator="gpu", devices=1,
         max_epochs=1000,
         precision=cfg.train.precision
     )
-    module = CSFD.monai.CSFDModule.load_from_checkpoint(str(ckpt_path), cfg=cfg, map_location=torch.device("cuda"))
-    datamodule = CSFD.monai.CSFDDataModule(cfg, df)
+    module = module_class.load_from_checkpoint(str(ckpt_path), cfg=cfg, map_location=torch.device("cuda"))
+    datamodule = datamodule_class(cfg, df)
     predicted = _predict(tl, module, datamodule, use_sigmoid=True)
     del tl, module, datamodule
     gc.collect()

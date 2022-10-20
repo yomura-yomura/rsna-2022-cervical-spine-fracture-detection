@@ -2,12 +2,13 @@ dataset:
   type: train
   data_root_path: ../data/rsna-2022-cervical-spine-fracture-detection/
   train_3d_images: ../data/3d_train_images_v4/
-  train_segmentations_path: ../semantic_segmentation/predicted_data3/uint8/fold0/
+#  train_segmentations_path: ../semantic_segmentation/models/UNet_256x256x256/predicted_data/uint8/fold0/
+  cropped_3d_images_path: ../data/cropped_3d_images/
 
-  semantic_segmentation_bb_path: ../semantic_segmentation/models/semantic_segmentation_bb/train_semantic_segmentation_bb_fold0.csv
-  common_shape_for_bb: [41, 122, 142]
+  semantic_segmentation_bb_path: ../semantic_segmentation/models/UNet_256x256x256/semantic_segmentation_bb/train_semantic_segmentation_bb_fold0.csv
+  common_shape_for_bb: [128, 256, 256]
 
-  use_segmentations: false
+  use_segmentation: false
 
 #  data_type: u1
   data_type: f4
@@ -44,10 +45,10 @@ dataset:
     n_folds: 4
     fold: null  # null -> run all folds for monai/run.py
 
-#  num_workers: null  # null -> os.cpu_count()
-  num_workers: 4
+  num_workers: null  # null -> os.cpu_count()
+#  num_workers: 4
   train_batch_size: 2
-  valid_batch_size: 4
+  valid_batch_size: 8
   test_batch_size: 2
 
   train_cache_rate: 0
@@ -70,20 +71,20 @@ model:
   optimizer:
     name: AdamW
     scheduler:
-#      name: null
+      name: null
 #      name: cosine
+##      kwargs:
+##        num_warmup_steps: 100
+##        num_training_steps: 500
+##      name: MultiStep
+##      kwargs:
+##        milestones: [300]f
+##        gamma: 1e-3
+#      name: CosineAnnealingWarmRestarts
 #      kwargs:
-#        num_warmup_steps: 100
-#        num_training_steps: 500
-#      name: MultiStep
-#      kwargs:
-#        milestones: [300]f
-#        gamma: 1e-3
-      name: CosineAnnealingWarmRestarts
-      kwargs:
-        T_0: 700
-        T_mult: 1
-        eta_min: 1e-9
+#        T_0: 700
+#        T_mult: 1
+#        eta_min: 1e-9
 
 
 train:
@@ -98,33 +99,34 @@ train:
 
   learning_rate: 1e-5
   weight_decay: 0
+
+  pos_weight: 2
+
   name_prefix: ""
-
-  name_suffix: v5.4.3
-
-  model_path: models2
+  name_suffix: Cropped3D-pos-weight-v1.0
+  model_path: models/pos_weight_v4
 
   early_stopping: false
 
-  validation_interval: 0.01
+  validation_interval: 0.99
   evaluate_after_steps: 0
 
   logging_interval: 1
 
-  augmentation:
-    scale_intensity:
-      kwargs:
-        factors: [-0.2, 0.2]
-        prob: 0.5
-    shift_intensity:
-      kwargs:
-        offsets: [-0.1, 0.1]
-        prob: 0.5
-    affine:
-      rotate_range_in_deg: [15, 0, 0]
-      translate_range_in_scale: [0, 0.0625, 0.0625]
-      kwargs:
-        prob: 0.5
-        scale_range: [0, 0.1, 0.1]
-        mode: nearest
-        padding_mode: reflection
+#  augmentation:
+#    scale_intensity:
+#      kwargs:
+#        factors: [-0.2, 0.2]
+#        prob: 0.5
+#    shift_intensity:
+#      kwargs:
+#        offsets: [-0.1, 0.1]
+#        prob: 0.5
+#    affine:
+#      rotate_range_in_deg: [15, 0, 0]
+#      translate_range_in_scale: [0, 0.0625, 0.0625]
+#      kwargs:
+#        prob: 0.5
+#        scale_range: [0, 0.1, 0.1]
+#        mode: nearest
+#        padding_mode: reflection

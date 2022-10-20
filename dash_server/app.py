@@ -1,16 +1,23 @@
+import flask
 from dash import Dash, html, dcc
 import dash
-import dash_auth
 import dash_bootstrap_components as dbc
 from dash import DiskcacheManager, CeleryManager
 import os
+import warnings
+from pages.common import *
+
+
+with warnings.catch_warnings():
+    warnings.simplefilter("ignore")
+    import dash_auth
+
 
 if 'REDIS_URL' in os.environ:
     # Use Redis & Celery if REDIS_URL set as an env variable
     from celery import Celery
     celery_app = Celery(__name__, broker=os.environ['REDIS_URL'], backend=os.environ['REDIS_URL'])
     background_callback_manager = CeleryManager(celery_app)
-
 else:
     # Diskcache for non-production apps when developing locally
     import diskcache
@@ -26,7 +33,8 @@ app = Dash(
     use_pages=True,
     background_callback_manager=background_callback_manager,
     external_stylesheets=[
-        dbc.themes.GRID,
+        # dbc.themes.GRID,
+        dbc.themes.BOOTSTRAP,
         "https://cdn.jsdelivr.net/npm/bootstrap-dark-5@1.1.3/dist/css/bootstrap-night.min.css"
     ]
 )
@@ -52,6 +60,9 @@ app.layout = html.Div([
     dash.page_container
 ])
 
+@app.server.route("/stored/pictures_images_with_bb/<uid>/<image_path>")
+def serve_pictures_of_images_with_bb(uid, image_path):
+    return flask.send_from_directory(stored_path["pictures_images_with_bb"] / uid, image_path)
 
 
 

@@ -12,7 +12,7 @@ dash.register_page(__name__)
 module_uid = __name__.replace(".", "_")
 
 
-# cfg = CSFD.data.io.load_yaml_config("../monai_with_semantic_segmentation/SEResNext50.yaml")
+# cfg = CSFD.data.io.load_yaml_config("../monai_with_ss_3d/SEResNext50.yaml")
 # cfg.dataset.type_to_load = "both"
 # df = CSFD.data.io_with_cfg.three_dimensions.get_df(cfg.dataset)
 # targets = [f"{uid} (#{i + 1})" for i, uid in enumerate(df["StudyInstanceUID"])]

@@ -30,12 +30,12 @@ def drop_invalids(*dfs):
 
 
 def get_df(
-    data_root_path, type, cv=None, target_columns=None,
+    data_root_path, dataset_type, cv=None, target_columns=None,
     ignore_invalid=True
 ):
-    df = pd.read_csv(pathlib.Path(data_root_path) / f"{type}.csv")
+    df = pd.read_csv(pathlib.Path(data_root_path) / f"{dataset_type}.csv")
 
-    if type == "train":
+    if dataset_type == "train":
         if cv is not None:
             _folds_csv_path = (
                 _folds_csv_root_path / "_".join([
@@ -78,7 +78,7 @@ def get_df(
         if ignore_invalid:
             df = drop_invalids(df)
 
-    elif type == "test":
+    elif dataset_type == "test":
         if len(get_submission_df(data_root_path)) == 3:
             df = pd.DataFrame({
                 "row_id": [
@@ -92,7 +92,7 @@ def get_df(
                 ]
             })
     else:
-        raise ValueError(f"Unexpected dataset_cfg.type: {type}")
+        raise ValueError(f"Unexpected dataset_cfg.type: {dataset_type}")
     return df
 
 

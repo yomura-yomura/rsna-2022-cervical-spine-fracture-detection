@@ -2,10 +2,11 @@ import omegaconf
 import warnings
 
 
-def load_yaml_config(path):
+def load_yaml_config(path, add_default_values=True, show_warning=True):
     cfg = omegaconf.OmegaConf.load(path)
     omegaconf.OmegaConf.set_struct(cfg, True)
-    add_default_values_if_not_defined(cfg)
+    if add_default_values:
+        add_default_values_if_not_defined(cfg, show_warning)
     return cfg
 
 
@@ -39,6 +40,7 @@ def add_default_values_if_not_defined(cfg, show_warnings=True):
             "data_type": "f4",
 
             "train_3d_images": None,
+            "train_cropped_3d_images_path": None,
 
             "image_2d_shape": None,
             "depth": None,
@@ -52,32 +54,37 @@ def add_default_values_if_not_defined(cfg, show_warnings=True):
             "use_normalized_batches": True,
             "equalize_adapthist": False,
 
-            "use_segmentations": False,
+            "use_segmentation": False,
             "train_segmentations_path": None,
             "semantic_segmentation_bb_path": None,
 
+            "cv": None,
             "num_workers": None,
 
             "use_voi_lut": False,
             "use_windowing": False,
-            # "cv": {
-            #     "type": "StratifiedKFold",
-            #     "seed": 42,
-            #     "n_folds": 4,
-            #     "fold": None
-            # },
 
             "train_cache_rate": 0,
-            "valid_cache_rate": 0
+            "valid_cache_rate": 0,
+
+            "cropped_2d_labels_path": None
         },
         "model": {
+            "spatial_dims": 3,
             "use_multi_sample_dropout": False,
-            "use_medical_net": False
+            "use_medical_net": False,
+            "optimizer": {
+                "scheduler": {
+                    "name": None
+                }
+            }
         },
         "train": {
             "seed": 42,
             "early_stopping": False,
-            "augmentation": {}
+            "save_on_train_epoch_end": False,
+            "augmentation": None,
+            "pos_weight": None
         }
     }.items():
         if not hasattr(cfg, cfg_key):

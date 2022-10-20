@@ -31,14 +31,23 @@ def get_semantic_segmentation_bb_df(df):
 
 
 cfg = CSFD.data.io.load_yaml_config("SEResNext50.yaml")
+
+train_segmentations_root_path = pathlib.Path("../semantic_segmentation/models/UNet_128x256x256")
+cfg.dataset.train_segmentations_path = train_segmentations_root_path / "predicted_data/uint8/fold0/"
+
 df = CSFD.data.io_with_cfg.three_dimensions.get_df(cfg.dataset)
 
 
-train_segmentations_path = pathlib.Path(cfg.dataset.train_segmentations_path)
+# train_segmentations_path = pathlib.Path(cfg.dataset.train_segmentations_path)
 
-for name in (p.name for p in train_segmentations_path.parent.glob("fold*") if p.is_dir()):
-    train_segmentations_path = train_segmentations_path.with_name(name)
-    target_csv_path = train_segmentations_path.with_name(f"segmentations-info-{train_segmentations_path.name}.csv")
+# train_segmentations_root_path = pathlib.Path("../semantic_segmentation/models/UNet_256x256x256")
+train_segmentations_predicted_uint8_path = train_segmentations_root_path / "predicted_data" / "uint8" / "fold0"
+
+for name in (p.name for p in train_segmentations_predicted_uint8_path.parent.glob("fold*") if p.is_dir()):
+    train_segmentations_predicted_uint8_path = train_segmentations_predicted_uint8_path.with_name(name)
+    target_csv_path = train_segmentations_predicted_uint8_path.with_name(
+        f"segmentations-info-{train_segmentations_predicted_uint8_path.name}.csv"
+    )
 
     if not target_csv_path.exists():
         data = []
@@ -60,8 +69,7 @@ for name in (p.name for p in train_segmentations_path.parent.glob("fold*") if p.
     else:
         segmentation_df = pd.read_csv(target_csv_path)
 
-    import pathlib
-    target_segmentation_bb_root_path = pathlib.Path("semantic_segmentation_bb")
+    target_segmentation_bb_root_path = train_segmentations_root_path / "semantic_segmentation_bb"
     target_segmentation_bb_root_path.mkdir(exist_ok=True)
 
     target_segmentation_bb_path = target_segmentation_bb_root_path / f"train_semantic_segmentation_bb_{name}.csv"
@@ -76,6 +84,8 @@ for name in (p.name for p in train_segmentations_path.parent.glob("fold*") if p.
     print(name)
     break
 
+
+ss_cfg = CSFD.data.io.load_yaml_config(train_segmentations_predicted_uint8_path / "UNet.yaml")
 # new_df.loc[:, df.columns] = df
 
 import plotly_utility.express as pux
@@ -128,7 +138,7 @@ for i in range(3):
     segmentation_df[f"max{i}"] = segmentation_df[f"mean{i}"] + segmentation_df[f"shape{i}"] / 2
 
 
-for i, size in enumerate([cfg.dataset.depth, *cfg.dataset.image_2d_shape]):
+for i, size in enumerate([ss_cfg.dataset.depth, *ss_cfg.dataset.image_2d_shape]):
     segmentation_df[f"min_scale{i}"] = segmentation_df[f"min{i}"] / size
     segmentation_df[f"max_scale{i}"] = segmentation_df[f"max{i}"] / size
 

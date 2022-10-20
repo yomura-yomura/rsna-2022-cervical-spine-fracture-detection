@@ -11,17 +11,17 @@ def get_df(cfg_dataset, ignore_invalids=True, n_jobs_to_save_images=-1):
         cfg_dataset.data_root_path, cfg_dataset.type, 
         cfg_dataset.type_to_load,
         cfg_dataset.train_3d_images, cfg_dataset.data_type,
-        cfg_dataset.depth, cfg_dataset.depth_range, cfg_dataset.save_images_with_specific_depth,
+        cfg_dataset.depth, cfg_dataset.depth_range,
         cfg_dataset.image_2d_shape,
-        cfg_dataset.height_range, cfg_dataset.save_images_with_specific_height,
-        cfg_dataset.width_range, cfg_dataset.save_images_with_specific_width,
+        cfg_dataset.height_range, cfg_dataset.width_range,
         cfg_dataset.enable_depth_resized_with_cv2,
         cfg_dataset.use_windowing,
         
         cfg_dataset.cv, cfg_dataset.target_columns,
-        cfg_dataset.use_segmentations, cfg_dataset.train_segmentations_path,
+        cfg_dataset.use_segmentation, cfg_dataset.train_segmentations_path,
 
-        ignore_invalids=ignore_invalids, n_jobs_to_save_images=n_jobs_to_save_images
+        ignore_invalids=ignore_invalids, n_jobs_to_save_images=n_jobs_to_save_images,
+        cropped_2d_labels_path=cfg_dataset.cropped_2d_labels_path
     )
 
 

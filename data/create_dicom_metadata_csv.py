@@ -8,7 +8,7 @@ import tqdm
 
 df = CSFD.data.io.three_dimensions.get_df(
     data_root_path="../data/rsna-2022-cervical-spine-fracture-detection",
-    type="train", type_to_load="dcm"
+    dataset_type="train", type_to_load="dcm"
 )
 
 data_path = pathlib.Path("dicom_metadata_csv")

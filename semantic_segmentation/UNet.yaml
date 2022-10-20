@@ -2,11 +2,11 @@ dataset:
   type: train
   data_root_path: ../data/rsna-2022-cervical-spine-fracture-detection
   train_3d_images: ../data/3d_train_images_v4
-
   data_type: f4
 
   enable_depth_resized_with_cv2: true
 
+  use_segmentation: true
   # Scales to crop images
 #  depth_range: [0.1, 0.9]
 #  height_range: [0, 0.7]
@@ -20,16 +20,15 @@ dataset:
 #  type_to_load: dcm
 
   use_normalized_batches: true
-  equalize_adapthist: false
   use_voi_lut: false
   use_windowing: true
 
   target_columns: [patient_overall, C1, C2, C3, C4, C5, C6, C7]
-  cv:
-    type: StratifiedKFold
-    seed: 42
-    n_folds: 4
-    fold: 0  # null -> run all folds for monai/run.py
+#  cv:
+#    type: StratifiedKFold
+#    seed: 42
+#    n_folds: 4
+#    fold: 0  # null -> run all folds for monai/run.py
 
   num_workers: null  # null -> os.cpu_count()
   train_batch_size: 2
@@ -41,12 +40,10 @@ dataset:
 #  train_cache_rate: 1
 #  valid_cache_rate: 1
 
-  use_segmentations: true
-
 
 model:
   seed: 42
-  name: Unet
+  name: UNet
   kwargs:
     spatial_dims: 3
     in_channels: 1
@@ -91,6 +88,7 @@ train:
   seed: 42
 
   max_epochs: 400
+#  max_epochs: 1
 
   learning_rate: 1e-4
   weight_decay: 0
@@ -99,8 +97,9 @@ train:
 #  name_suffix: v5.3.1
   name_suffix: v5.5.1
 
-  model_path: models6
+  model_path: models/UNet_256x256x256_7folds/model_data
 
+  save_on_train_epoch_end: true
   early_stopping: false
 
   validation_interval: 0.99

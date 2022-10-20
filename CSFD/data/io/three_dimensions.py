@@ -2,6 +2,7 @@ import gc
 import sys
 import warnings
 import cv2
+import pandas as pd
 import pydicom
 import tqdm
 import numpy as np
@@ -133,30 +134,34 @@ def load_3d_images(
 
 
 def get_df(
-        data_root_path, type,
-        type_to_load,
+        data_root_path, dataset_type,
+        type_to_load="dcm",
         train_3d_images=None, data_type=None,
-        depth=None, depth_range=None, save_images_with_specific_depth=False,
+        depth=None, depth_range=None,
         image_2d_shape=None,
-        height_range=None, save_images_with_specific_height=False,
-        width_range=None, save_images_with_specific_width=False,
+        height_range=None, width_range=None,
         enable_depth_resized_with_cv2=True,
         use_windowing=False,
 
         cv=None, target_columns=None,
-        use_segmentations=False, train_segmentations_path=None,
+        use_segmentation=False, train_segmentations_path=None,
 
-        ignore_invalids=True, n_jobs_to_save_images=-1
+        ignore_invalids=True, n_jobs_to_save_images=-1,
+        cropped_2d_labels_path=None
 ):
     df = _io_module.two_dimensions.get_df(
-        data_root_path, type, cv, target_columns,
+        data_root_path, dataset_type, cv, target_columns,
         ignore_invalid=ignore_invalids
     )
 
-    if use_segmentations:
+    if use_segmentation:
         for p in (pathlib.Path(data_root_path) / "segmentations").glob("*.nii"):
             df.loc[df["StudyInstanceUID"] == p.name[:-4], "nil_segmentations_path"] = p
         df = df.dropna()
+
+    if cropped_2d_labels_path is not None:
+        cropped_2d_labels_df = pd.read_csv(cropped_2d_labels_path)
+        df = df[df["StudyInstanceUID"].isin(cropped_2d_labels_df["StudyInstanceUID"])]
 
     if train_segmentations_path:
         train_segmentations_path = pathlib.Path(train_segmentations_path)
@@ -166,10 +171,10 @@ def get_df(
             warnings.warn(f"{np.count_nonzero(does_exist):,} npz_segmentations_path not found.")
             df.loc[~does_exist, "npz_segmentations_path"] = np.nan
 
-    if type_to_load not in ("npz", "dcm", "both"):
+    if type_to_load not in ("npz", "dcm"):
         raise ValueError(type_to_load)
 
-    if type_to_load in ("npz", "both"):
+    if type_to_load == "npz":
         depth_dir = (
             "_".join([
                 f"{depth}" if depth is not None else "normal",
@@ -188,7 +193,8 @@ def get_df(
                 f"{'-'.join(map(str, width_range or [0, 1])) if width_range is not None else 'normal'}"
             ])
         )
-
+        if train_3d_images is None:
+            raise ValueError(f"train_3d_images must not be None")
         output_dir_path = (
             pathlib.Path(train_3d_images)
             / ("windowing" if use_windowing else "normal")
@@ -199,7 +205,7 @@ def get_df(
             / np.dtype(data_type).name
         )
         save_all_3d_images(
-            images_dir_path=pathlib.Path(data_root_path) / f"{type}_images",
+            images_dir_path=pathlib.Path(data_root_path) / f"{dataset_type}_images",
             output_dir_path=output_dir_path,
             image_2d_shape=image_2d_shape,
             enable_depth_resized_with_cv2=enable_depth_resized_with_cv2,
@@ -213,9 +219,9 @@ def get_df(
         df["np_images_path"] = df["StudyInstanceUID"].map(lambda uid: output_dir_path / f"{uid}.npz")
         if np.all(df["np_images_path"].map(lambda p: p.exists())) == np.False_:
             raise FileNotFoundError
-    if type_to_load in ("dcm", "both"):
-        df["dcm_images_path"] = df["StudyInstanceUID"].map(
-            lambda uid: pathlib.Path(data_root_path) / f"{type}_images" / uid
-        )
+
+    df["dcm_images_path"] = df["StudyInstanceUID"].map(
+        lambda uid: pathlib.Path(data_root_path) / f"{dataset_type}_images" / uid
+    )
 
     return df

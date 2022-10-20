@@ -37,7 +37,10 @@ if __name__ == "__main__":
         #     continue
         print(f"* fold {fold}")
         cfg.dataset.cv.fold = fold
-        predicted = CSFD.monai.from_checkpoint.predict(cfg, ckpt_path, df)
+        predicted = CSFD.monai.from_checkpoint.predict(
+            cfg, ckpt_path, df,
+            module_class=CSFD.monai.CSFDModule, datamodule_class=CSFD.monai.CSFDDataModule
+        )
         print(predicted)
         predicted_df = pd.DataFrame(
             predicted, columns=cfg.dataset.target_columns

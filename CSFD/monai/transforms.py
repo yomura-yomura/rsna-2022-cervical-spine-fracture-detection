@@ -12,9 +12,11 @@ from monai.transforms import (
 import torch
 
 
-def get_transforms(cfg, is_train):
+def get_transforms(cfg, is_train, use_segmentation=False):
     transforms = [
-        LoadImage(cfg.dataset)
+        LoadImageWithSegmentation(cfg.dataset, is_train)
+        if use_segmentation else
+        LoadImage(cfg.dataset, is_train)
     ]
 
     if is_train:
@@ -70,10 +72,11 @@ def normalize_image_wise(data):
 
 
 class LoadImage(monai.transforms.MapTransform):
-    def __init__(self, cfg_dataset):
+    def __init__(self, cfg_dataset, is_train):
         keys = ["StudyInstanceUID", "np_images_path", "dcm_images_path", "nil_segmentations_path"]
         super().__init__(keys, allow_missing_keys=True)
         self.cfg_dataset = cfg_dataset
+        self.is_train = is_train
 
     def __call__(self, row: dict):
         uid = row["StudyInstanceUID"]
@@ -108,7 +111,14 @@ class LoadImage(monai.transforms.MapTransform):
                 "label": target_columns
             }
 
-        if self.cfg_dataset.use_segmentations:
+        return ret
+
+
+class LoadImageWithSegmentation(LoadImage):
+    def __call__(self, row: dict):
+        ret = super(LoadImageWithSegmentation, self).__call__(row)
+
+        if "nil_segmentations_path" in row.keys():
             segmentations = CSFD.data.io.two_dimensions.load_segmentations(
                 row["nil_segmentations_path"], separate_in_channels=True
             )
@@ -125,5 +135,4 @@ class LoadImage(monai.transforms.MapTransform):
                 self.cfg_dataset.depth, self.cfg_dataset.depth_range, self.cfg_dataset.enable_depth_resized_with_cv2
             )
             ret["segmentation"] = segmentations / 255
-
         return ret

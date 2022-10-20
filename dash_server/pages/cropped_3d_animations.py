@@ -16,118 +16,84 @@ __version__ = "1.0"
 dash.register_page(__name__)
 module_uid = __name__.replace(".", "_")
 
-number_regex = r"(?:\d+(?:\.\d+)?)"
-depth_range_regex = rf"\[({number_regex}),\W?({number_regex})\]"
-common_shape_for_bb_regex = rf"\[({number_regex}|None),\W?({number_regex}|None),\W?({number_regex}|None)\]"
+default_query_kwargs = dict(
+    uid="1", model_version="v1 (256x256x256)", preprocessing_type="windowing",
+    depth_range="[0, 1]", common_shape_for_bb="[128, 256, 256]",
+    depth="256", height="256", width="256"
+)
 
 
-def layout(
-        uid="0", preprocessing_type="normal",
-        depth_range="[0.1, 0.9]", common_shape_for_bb = "[128, 256, 256]",
-        depth="128", height="256", width="256",
-        **kwargs
-):
-    if len(kwargs) > 0:
-        warnings.warn(f"{kwargs} not expected")
-
-    if depth == "original":
-        depth = "0"
-    if height == "original":
-        height = "0"
-    if width == "original":
-        width = "0"
-
-    default_target = parse_uid_query(uid)
+def layout(**given_kwargs):
+    given_kwargs = validate_layout_kwargs(given_kwargs, default_query_kwargs)
 
     return html.Div([
-        dcc.Store(id='my-parameters-cache', storage_type='local'),
         html.H2(f"Animations of Cropped 3D (v{__version__})"),
         dcc.Dropdown(
             id=f"my-input-uid-dropdown-{module_uid}",
-            options=targets, value=default_target
+            options=targets, value=given_kwargs["uid"],
+            clearable=False
         ),
-
-        dbc.Input(id="my-input-depth-range", pattern=depth_range_regex, value=depth_range),
-        dcc.Dropdown(id="my-dropdown-preprocessing-type", options=["normal", "voi_lut", "windowing"], value=preprocessing_type),
+        dcc.Dropdown(
+            id="my-dropdown-ss-model-version",
+            options=list(ss_model_dict.keys()),
+            value=given_kwargs["model_version"]
+        ),
+        dbc.Input(id="my-input-depth-range", pattern=depth_range_regex, value=given_kwargs["depth_range"]),
+        dcc.Dropdown(
+            id=f"my-dropdown-preprocessing-type-{module_uid}",
+            options=["normal", "voi_lut", "windowing"], value=given_kwargs["preprocessing_type"]
+        ),
         dcc.Slider(
             id="my-slider-depth",
-            min=0, max=512, value=int(depth),
+            min=0, max=512, value=int(given_kwargs["depth"]),
             marks={0: {"label": "original"}, 128: {"label": "128"}, 256: {"label": "256"}, 512: {"label": "512"}},
             tooltip={"placement": "bottom", "always_visible": False}
         ),
         dcc.Slider(
             id="my-slider-height",
-            min=0, max=512, value=int(height),
+            min=0, max=512, value=int(given_kwargs["height"]),
             marks={0: {"label": "original"}, 128: {"label": "128"}, 256: {"label": "256"}, 512: {"label": "512"}},
             tooltip={"placement": "bottom", "always_visible": False}
         ),
         dcc.Slider(
             id="my-slider-width",
-            min=0, max=512, value=int(width),
+            min=0, max=512, value=int(given_kwargs["width"]),
             marks={0: {"label": "original"}, 128: {"label": "128"}, 256: {"label": "256"}, 512: {"label": "512"}},
             tooltip={"placement": "bottom", "always_visible": False}
         ),
-        dbc.Input(id=f"my-input-common-shape-for-bb", pattern=common_shape_for_bb_regex, value=common_shape_for_bb),
+        dbc.Input(
+            id=f"my-input-common-shape-for-bb", pattern=common_shape_for_bb_regex,
+            value=given_kwargs["common_shape_for_bb"]
+        ),
         html.Div([
-            dbc.Progress(id="my-progress-bar", value=0, striped=True, animated=True, style={"visibility": "hidden"}),
-            html.Div(id="my-progressing-status", children="", style={"visibility": "hidden"}),
+            *get_elements_of_status_bar(f"{module_uid}"),
+            # dbc.Progress(id="my-progress-bar", value=0, striped=True, animated=True, style={"visibility": "hidden"}),
+            # html.Div(id="my-progressing-status", children="", style={"visibility": "hidden"}),
             dcc.Loading(
                 id=f"loading-{module_uid}",
-                children=get_dcc_graph(module_uid),
+                children=get_dcc_graph(f"{module_uid}"),
                 type="circle"
             )
         ])
     ])
 
 
-
-# @callback(
-#     [Output(component_id=f"my-input-uid-dropdown-{module_uid}", component_property="value"),
-#      Output(component_id="my-dropdown-preprocessing-type", component_property="value"),
-#      Output(component_id="my-slider-height", component_property="value"),
-#      Output(component_id="my-slider-width", component_property="value")],
-#     Input("my-parameters-cache", 'modified_timestamp'),
-#     State("my-parameters-cache", 'data')
-# )
-# def on_data(ts, data):
-#     if ts is None or data is None:
-#         raise dash.exceptions.PreventUpdate
-#     return data
-
-
 @callback(
     Output(component_id=f"my-graph-{module_uid}", component_property="figure"),
     [Input(component_id=f"my-input-uid-dropdown-{module_uid}", component_property="value"),
-     Input(component_id="my-dropdown-preprocessing-type", component_property="value"),
+     Input(component_id="my-dropdown-ss-model-version", component_property="value"),
+     Input(component_id=f"my-dropdown-preprocessing-type-{module_uid}", component_property="value"),
      Input(component_id="my-input-depth-range", component_property="value"),
      Input(component_id=f"my-input-common-shape-for-bb", component_property="value"),
      Input(component_id="my-slider-depth", component_property="value"),
      Input(component_id="my-slider-height", component_property="value"),
      Input(component_id="my-slider-width", component_property="value")],
-    progress=[Output("my-progress-bar", "value"), Output("my-progressing-status", "children")],
-    running=[
-        (
-                Output("my-progress-bar", "style"),
-                {"visibility": "visible"},
-                {"visibility": "hidden"},
-        ),
-        (
-                Output("my-progressing-status", "style"),
-                {"visibility": "visible"},
-                {"visibility": "hidden"},
-        ),
-        # (
-        #     Output(f"my-graph-{module_uid}", "style"),
-        #     {"visibility": "hidden"},
-        #     {"visibility": "visible"},
-        # )
-    ],
-    background=True
+    **get_kwargs_to_callback_for_progress_bar(f"{module_uid}")
 )
-def plot(set_progress, target, preprocessing_type, depth_range, common_shape_for_bb, depth, height, width):
-    if target is None:
-        raise dash.exceptions.PreventUpdate
-    uid, _ = target.split()
+def plot(set_progress, target, ss_model_version, preprocessing_type, depth_range, common_shape_for_bb, depth, height, width):
+    uid, unet_ss_model_name = validate_callback_kwargs(
+        uid_dropdown_text=target, ss_model_version=ss_model_version
+    )
 
     depth_range = list(map(float, re.match(depth_range_regex, depth_range).groups()))
     common_shape_for_bb = list(map(eval, re.match(common_shape_for_bb_regex, common_shape_for_bb).groups()))
@@ -146,10 +112,13 @@ def plot(set_progress, target, preprocessing_type, depth_range, common_shape_for
     else:
         cfg.dataset.depth_range = depth_range
 
+    cfg.dataset.semantic_segmentation_bb_path = f"../semantic_segmentation/models/{unet_ss_model_name}/semantic_segmentation_bb/train_semantic_segmentation_bb_fold0.csv"
     cfg.dataset.common_shape_for_bb = common_shape_for_bb
 
     if height == 0 and width == 0:
         cfg.dataset.image_2d_shape = None
+    elif height == 0 or width == 0:
+        raise dash.exceptions.PreventUpdate("both/neither of height and/nor width must be None/non-None")
     else:
         cfg.dataset.image_2d_shape = [height, width]
 

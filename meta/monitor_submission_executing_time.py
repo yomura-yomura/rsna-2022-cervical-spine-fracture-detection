@@ -1,3 +1,5 @@
+import pathlib
+
 import kaggle
 import time
 import datetime as dt
@@ -24,8 +26,6 @@ api.authenticate()
 # print(refs)
 # n_pending = len(refs)
 
-f = open("results.tsv", "a", encoding="utf-8")
-
 old_refs = []
 while True:
     pending_subs = [
@@ -50,15 +50,26 @@ while True:
                     str(dt.datetime.utcnow() - sub.date).split('.')[0]
                 ])
                 print(f"* Completed: {result}")
-                f.write(f"{result}\n")
-                f.flush()
+                with open("results.tsv", "a") as f:
+                    f.write(f"{result}\n")
+                    f.flush()
         old_refs = pending_refs
 
+    latest_status_fn = pathlib.Path("latest_status.txt")
+
     if len(pending_subs) > 0:
+        msg_list = []
         for sub in pending_subs:
             if sub.status == "pending":
-                print(f"{sub.ref} {sub.fileName} by {sub.submittedBy} ({str(dt.datetime.utcnow() - sub.date).split('.')[0]})")
+                msg = f"{sub.ref} {sub.fileName} by {sub.submittedBy} ({str(dt.datetime.utcnow() - sub.date).split('.')[0]})"
+                print(msg)
+                msg_list.append(msg)
         print(flush=True)
 
+        with open(latest_status_fn, "w") as f:
+            print("\n".join(msg_list), file=f)
+    else:
+        if latest_status_fn.exists():
+            latest_status_fn.rename(latest_status_fn.parent / "_stored_last_status.txt")
     # sys.stdout.flush()
     time.sleep(60)

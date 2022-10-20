@@ -25,4 +25,8 @@ if __name__ == "__main__":
 
     cfg.train.model_path = model_path
     print(cfg)
-    CSFD.monai.training.train(cfg)
+    CSFD.monai.training.train(
+        cfg,
+        module_class=CSFD.monai.CSFDModule,
+        datamodule_class=CSFD.monai.CSFDDataModule
+    )

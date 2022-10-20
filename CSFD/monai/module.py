@@ -11,7 +11,7 @@ import monai.losses
 from ..metric import torch as _metric_torch_module
 
 
-__all__ = ["CSFDModule"]
+__all__ = ["CSFDModule", "CSFDSemanticSegmentationModule", "CSFDCroppedModule"]
 
 
 class AverageMeter(object):
@@ -42,35 +42,37 @@ Available net_name: {available_model_names}
 """)
         return model
 
+    @property
+    def num_classes(self):
+        return len(self.cfg.dataset.target_columns)
+    
+    def _create_model(self, n_model_outputs) -> torch.nn.Module:
+        model = self._get_model_from_cfg()
+        return model(
+            **self.cfg.model.kwargs,
+            spatial_dims=self.cfg.model.spatial_dims,
+            num_classes=n_model_outputs        
+        )
+    
     def __init__(self, cfg):
         super().__init__()
 
         self.cfg = cfg
-        self.num_classes = len(self.cfg.dataset.target_columns)
 
-        self.n_model_outputs = None
+        if self.cfg.model.use_multi_sample_dropout:
+            n_model_outputs = 100
+            self.dropouts = [nn.Dropout(p) for p in np.linspace(0.1, 0.5, 5)]
+            self.Linear = nn.Linear(n_model_outputs, self.num_classes)
+        else:
+            n_model_outputs = self.num_classes
 
-        self.dropouts = None
-        self.Linear = None
-
-        self.model = None
+        self.model = self._create_model(n_model_outputs)
+        
         self.train_loss_meter = AverageMeter()
 
+        self.loss_func = _metric_torch_module.competition_loss_with_logits
+
     def setup(self, stage: Optional[str] = None) -> None:
-        if self.cfg.model.use_multi_sample_dropout:
-            self.n_model_outputs = 100
-            self.dropouts = [nn.Dropout(p) for p in np.linspace(0.1, 0.5, 5)]
-            self.Linear = nn.Linear(self.n_model_outputs, self.num_classes)
-        else:
-            self.n_model_outputs = self.num_classes
-
-        model = self._get_model_from_cfg()
-        self.model: torch.nn.Module = model(
-            **self.cfg.model.kwargs,
-            spatial_dims=3,
-            num_classes=self.n_model_outputs
-        )
-
         if stage == "fit":
             if self.cfg.train.evaluate_after_steps > 0:
                 self.trainer.limit_val_batches = 0
@@ -101,44 +103,43 @@ Available net_name: {available_model_names}
             )
         return logits
 
-    def _log_train_loss(self, loss, logits, label):
+    def _log_train_loss(self, loss, n_losses):
         if torch.isfinite(loss):
-            self.train_loss_meter.update(loss.item(), len(logits))
+            self.train_loss_meter.update(loss.item(), n_losses)
             self.log("train/loss", self.train_loss_meter.avg, prog_bar=False)
         else:
             warnings.warn(f"""
         nan/inf detected: loss = {loss}
-        logits = {logits}
-        label = {label}
         """, UserWarning)
 
-    def training_step(self, batch, batch_idx):
+    def training_step(self, batch, batch_idx) -> dict:
         logits = self.forward(batch)
-        loss = _metric_torch_module.competition_loss_with_logits(logits, batch["label"])
-        self._log_train_loss(loss, logits, batch["label"])
-        return loss
+        loss = self.loss_func(logits, batch["label"])
+        return {"loss": loss, "logits": logits}
 
-    def training_step_end(self, *args, **kwargs):
+    def training_step_end(self, batch_parts: dict):
+        self._log_train_loss(batch_parts["loss"], len(batch_parts["logits"]))
         if (
             self.global_step >= self.cfg.train.evaluate_after_steps
             and self.trainer.limit_val_batches == 0.0
         ):
             self.trainer.limit_val_batches = 1.0
 
-    def _log_validation_loss(self, loss, logits, label):
+    def _log_validation_loss(self, loss):
         if torch.isfinite(loss):
             self.log("valid/loss", loss, prog_bar=False)
         else:
             warnings.warn(f"""
         nan/inf detected: loss = {loss}
-        logits = {logits}
-        label = {label}
         """, UserWarning)
 
-    def validation_step(self, batch, batch_idx):
+    def validation_step(self, batch, batch_idx) -> dict:
         logits = self.forward(batch)
-        loss = _metric_torch_module.competition_loss_with_logits(logits, batch["label"])
-        self._log_validation_loss(loss, logits, batch["label"])
+        loss = self.loss_func(logits, batch["label"])
+        return {"loss": loss}
+        
+    def validation_step_end(self, batch_parts: dict):
+        self._log_validation_loss(batch_parts["loss"])
 
     def configure_optimizers(self):
         if self.cfg.model.optimizer.name == "AdamW":
@@ -170,51 +171,59 @@ Available net_name: {available_model_names}
 
 
 class CSFDSemanticSegmentationModule(CSFDModule):
-    def __init__(self, cfg):
-        super(CSFDSemanticSegmentationModule, self).__init__(cfg)
-        self.segmentation_loss = monai.losses.DiceLoss(batch=True)
-        self.segmentation_metric = monai.metrics.DiceMetric()
-
-    def setup(self, stage: Optional[str] = None) -> None:
+    def _create_model(self, n_model_outputs) -> torch.nn.Module:
         model = self._get_model_from_cfg()
-        self.model: torch.nn.Module = model(
+        return model(
             **self.cfg.model.kwargs
         )
 
-    def training_step(self, batch, batch_idx):
+    def __init__(self, cfg):
+        super().__init__(cfg)
+        self.loss_func = monai.losses.DiceLoss(batch=True)
+        self.metric_func = monai.metrics.DiceMetric()
+
+    def training_step(self, batch, batch_idx) -> dict:
         logits = self.forward(batch)
         predicted = logits.sigmoid()
         true = batch["segmentation"]
-        loss = self.segmentation_loss(predicted, true)
-        self._log_train_loss(loss, logits, batch["label"])
-        return loss
+        loss = self.loss_func(predicted, true)
+        return {"loss": loss, "logits": logits}
 
-    def validation_step(self, batch, batch_idx):
+    def validation_step(self, batch, batch_idx) -> dict:
         logits = self.forward(batch)
 
         true = torch.where(batch["segmentation"] > 0.5, 1, 0)
         predicted = torch.where(logits.sigmoid() > 0.5, 1, 0)
 
-        metric = self.segmentation_metric(predicted, true).mean(axis=0).mean(axis=0)
-        self.log("valid/metric", metric, prog_bar=False)
+        metric = self.metric_func(predicted, true).mean(axis=0).mean(axis=0)
+        loss = self.loss_func(logits.sigmoid(), true)
+        return {"loss": loss, "metric": metric}
+    
+    def validation_step_end(self, batch_parts: dict):
+        super(CSFDSemanticSegmentationModule, self).validation_step_end(batch_parts)
+        self.log("valid/metric", batch_parts["metric"], prog_bar=False)
 
-        loss = self.segmentation_loss(logits.sigmoid(), true)
-        self._log_validation_loss(loss, logits, batch["label"])
 
+class CSFDCroppedModule(CSFDModule):
+    @property
+    def num_classes(self):
+        return 1
 
-class CSFDCropped3DModule(CSFDModule):
     def __init__(self, cfg):
-        super(CSFDCropped3DModule, self).__init__(cfg)
-        self.num_classes = 1
+        super().__init__(cfg)
+        if cfg.train.pos_weight is None:
+            pos_weight = None
+        else:
+            pos_weight = torch.tensor(cfg.train.pos_weight)
+        self.loss_func = nn.BCEWithLogitsLoss(reduction='none', pos_weight=pos_weight)
 
-    def training_step(self, batch, batch_idx):
+    def training_step(self, batch, batch_idx) -> dict:
         logits = self.forward(batch)
-        loss = torch.mean(_metric_torch_module.loss_fn(logits, batch["label"]))
-        self._log_train_loss(loss, logits, batch["label"])
-        return loss
+        loss = torch.mean(self.loss_func(logits, batch["label"]))
+        return {"loss": loss, "logits": logits}
 
-    def validation_step(self, batch, batch_idx):
+    def validation_step(self, batch, batch_idx) -> dict:
         logits = self.forward(batch)
 
-        loss = torch.mean(_metric_torch_module.loss_fn(logits, batch["label"]))
-        self._log_validation_loss(loss, logits, batch["label"])
+        loss = torch.mean(self.loss_func(logits, batch["label"]))
+        return {"loss": loss}
