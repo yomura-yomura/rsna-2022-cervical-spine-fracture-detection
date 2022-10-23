@@ -47,6 +47,7 @@ def weighted_loss(y_pred_logit, y, reduction='mean', verbose=False,DEVICE ='cuda
         y_pred_logit,
         y,
         reduction='none',
+        pos_weight=torch.as_tensor(2)
     )
 
     if verbose:

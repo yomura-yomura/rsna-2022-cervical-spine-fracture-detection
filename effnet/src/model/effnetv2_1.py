@@ -111,7 +111,7 @@ def evaluate_effnet(model: EffnetModel, ds, max_batches=PREDICT_MAX_BATCHES, shu
                 with autocast():
                     y_frac_pred= model.forward(X.to(DEVICE))
                     #Binary Cross Entoropy
-                    frac_loss = torch.nn.functional.binary_cross_entropy_with_logits(y_frac_pred.to(DEVICE),y_frac.to(DEVICE),reduction='none')
+                    frac_loss = torch.nn.functional.binary_cross_entropy_with_logits(y_frac_pred.to(DEVICE),y_frac.to(DEVICE),reduction='none',pos_weight=torch.as_tensor(2))
                     valid_score = auroc(torch.sigmoid(y_frac_pred).to(DEVICE),y_frac.to(DEVICE).to(torch.int64))
                     valid_list.append(valid_score.cpu())
                     pred_frac.append(torch.sigmoid(y_frac_pred))
@@ -149,7 +149,7 @@ def train_effnet(ds_train, ds_eval, logger, name):
             # Using mixed precision training
             with autocast():
                 y_frac_pred  = model.forward(X.to(DEVICE))
-                loss = torch.nn.functional.binary_cross_entropy_with_logits(y_frac_pred.to(DEVICE),y_frac.to(DEVICE),reduction='none')
+                loss = torch.nn.functional.binary_cross_entropy_with_logits(y_frac_pred.to(DEVICE),y_frac.to(DEVICE),reduction='none',pos_weight=torch.as_tensor(2))
                 #loss = torch.mean(loss).cpu()
 
                 if np.isinf(np.sum(loss.cpu().detach().numpy()).all()) or np.isnan(loss.cpu().detach().numpy().all()):
