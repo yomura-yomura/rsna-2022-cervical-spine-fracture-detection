@@ -184,7 +184,7 @@ def plot2(set_progress, target, ss_model_version):
     ss_count_fig = px.bar(
         ss_count_df,
         x="level_0", y=0, color="level_1", barmode="overlay",
-        labels={"level_0": "depth", "0": "count"},
+        labels={"level_0": "depth", "0": "count", "level_1": "label"},
         template="plotly_dark"
     )
 
